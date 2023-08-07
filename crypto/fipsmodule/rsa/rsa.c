@@ -556,6 +556,7 @@ int rsa_sign_no_self_test(int hash_nid, const uint8_t *digest,
     // All supported digest lengths fit in |unsigned|.
     assert(digest_len <= EVP_MAX_MD_SIZE);
     OPENSSL_STATIC_ASSERT(EVP_MAX_MD_SIZE <= UINT_MAX, digest_too_long);
+   
     return rsa->meth->sign(hash_nid, digest, (unsigned)digest_len, out, out_len,
                            rsa);
   }
@@ -593,7 +594,6 @@ err:
 int RSA_sign(int hash_nid, const uint8_t *digest, size_t digest_len,
              uint8_t *out, unsigned *out_len, RSA *rsa) {
   boringssl_ensure_rsa_self_test();
-
   return rsa_sign_no_self_test(hash_nid, digest, digest_len, out, out_len, rsa);
 }
 

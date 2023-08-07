@@ -909,11 +909,12 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
   assert(rsa->dmq1 != NULL);
   assert(rsa->iqmp != NULL);
 
-  BIGNUM *r1, *m1;
+  BIGNUM *r1, *r2, *m1;
   int ret = 0;
 
   BN_CTX_start(ctx);
   r1 = BN_CTX_get(ctx);
+  r2 = BN_CTX_get(ctx);
   m1 = BN_CTX_get(ctx);
   if (r1 == NULL ||
       m1 == NULL) {
@@ -946,12 +947,11 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
   // caller.
   assert(BN_ucmp(I, n) < 0);
 
-  if (// |m1| is the result modulo |q|.
-      !mod_montgomery(r1, I, q, mont_q, p, ctx) ||
-      !BN_mod_exp_mont_consttime(m1, r1, dmq1, q, ctx, mont_q) ||
+  if (!mod_montgomery(r1, I, q, mont_q, p, ctx) ||
+      !mod_montgomery(r2, I, p, mont_p, q, ctx) ||
       // |r0| is the result modulo |p|.
-      !mod_montgomery(r1, I, p, mont_p, q, ctx) ||
-      !BN_mod_exp_mont_consttime(r0, r1, dmp1, p, ctx, mont_p) ||
+      !BN_mod_exp_mont_consttime_x2(m1, r1, dmq1, q, mont_q,
+                                    r0, r2, dmp1, p, mont_p, ctx) ||
       // Compute r0 = r0 - m1 mod p. |p| is the larger prime, so |m1| is already
       // fully reduced mod |p|.
       !bn_mod_sub_consttime(r0, r0, m1, p, ctx) ||
