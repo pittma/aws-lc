@@ -1005,6 +1005,12 @@ OPENSSL_EXPORT int BN_bn2binpad(const BIGNUM *in, uint8_t *out, int len);
 // BN_secure_new calls |BN_new|.
 OPENSSL_EXPORT BIGNUM *BN_secure_new(void);
 
+OPENSSL_EXPORT int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1,
+                                 const BIGNUM *m1, const BN_MONT_CTX *in_mont1,
+                                 BIGNUM *rr2, const BIGNUM *a2, const BIGNUM *p2,
+                                 const BIGNUM *m2, const BN_MONT_CTX *in_mont2,
+                                 BN_CTX *ctx);;
+
 
 // Private functions
 
