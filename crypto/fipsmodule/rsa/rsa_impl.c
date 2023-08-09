@@ -958,11 +958,9 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
 
   if (// |m1| is the result modulo |q|.
       !mod_montgomery(r2, I, p, mont_p, q, ctx) ||
-      !BN_mod_exp_mont_consttime(m1, r1, dmq1, q, ctx, mont_q) ||
-      !BN_mod_exp_mont_consttime(r0, r2, dmp1, p, ctx, mont_p) ||
       // |r0| is the result modulo |p|.
-      /* !BN_mod_exp_mont_consttime_x2(m1, r1, dmq1, q, mont_q, */
-      /*                                r0, r1, dmp1, p, mont_p, ctx) || */
+      !BN_mod_exp_mont_consttime_x2(m1, r1, dmq1, q, mont_q,
+                                     r0, r2, dmp1, p, mont_p, ctx) ||
       // Compute r0 = r0 - m1 mod p. |p| is the larger prime, so |m1| is already
       // fully reduced mod |p|.
       !bn_mod_sub_consttime(r0, r0, m1, p, ctx) ||
@@ -987,6 +985,7 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
   ret = 1;
 
 err:
+  BN_free(r2);
   BN_CTX_end(ctx);
   return ret;
 }
