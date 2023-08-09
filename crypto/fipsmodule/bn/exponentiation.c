@@ -1280,7 +1280,6 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
     }
 #endif
 
-    printf("taking old path\n");
     /* rr1 = a1^p1 mod m1 */
     ret = BN_mod_exp_mont_consttime(rr1, a1, p1, m1, ctx, in_mont1);
     /* rr2 = a2^p2 mod m2 */
