@@ -946,10 +946,6 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
   // caller.
   assert(BN_ucmp(I, n) < 0);
 
-
-  mod_montgomery(r1, I, q, mont_q, p, ctx);
-  
-
   BIGNUM *r2 = BN_new();
   if (!mod_montgomery(r1, I, q, mont_q, p, ctx))
       goto err;

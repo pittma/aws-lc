@@ -1268,13 +1268,11 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
 
         rr1->width = widthn;
         rr1->neg = 0;
-        //bn_correct_width(rr1);
-        //bn_check_width(rr1);
+        bn_set_minimal_width(rr1);
 
         rr2->width = widthn;
         rr2->neg = 0;
-        //bn_correct_width(rr2);
-        //bn_check_width(rr2);
+        bn_set_minimal_width(rr2);
 
         goto err;
     }
