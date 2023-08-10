@@ -909,13 +909,15 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
   assert(rsa->dmq1 != NULL);
   assert(rsa->iqmp != NULL);
 
-  BIGNUM *r1, *m1;
+  BIGNUM *r1, *r2, *m1;
   int ret = 0;
 
   BN_CTX_start(ctx);
   r1 = BN_CTX_get(ctx);
+  r2 = BN_CTX_get(ctx);
   m1 = BN_CTX_get(ctx);
   if (r1 == NULL ||
+      r2 == NULL ||
       m1 == NULL) {
     goto err;
   }
@@ -946,13 +948,8 @@ static int mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx) {
   // caller.
   assert(BN_ucmp(I, n) < 0);
 
-  BIGNUM *r2 = BN_new();
-  if (!mod_montgomery(r1, I, q, mont_q, p, ctx))
-      goto err;
-
-  BN_copy(r2, r1);
-
   if (// |m1| is the result modulo |q|.
+      !mod_montgomery(r1, I, q, mont_q, p, ctx) ||
       !mod_montgomery(r2, I, p, mont_p, q, ctx) ||
       // |r0| is the result modulo |p|.
       !BN_mod_exp_mont_consttime_x2(m1, r1, dmq1, q, mont_q,
