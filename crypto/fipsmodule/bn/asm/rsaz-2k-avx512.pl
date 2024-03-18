@@ -80,23 +80,6 @@ if ($avx512ifma>0) {{{
 ("%rcx","%rdx","%r8","%r9","%r10","%r11") :
 ("%rdi","%rsi","%rdx","%rcx","%r8","%r9");
 
-$code.=<<___;
-.text
-.extern OPENSSL_ia32cap_P
-.globl  ossl_rsaz_avx512ifma_eligible
-.type   ossl_rsaz_avx512ifma_eligible,\@abi-omnipotent
-.align  32
-ossl_rsaz_avx512ifma_eligible:
-    leaq OPENSSL_ia32cap_P(%rip),%r11
-    mov	 8(%r11),%r11d
-    xor %eax,%eax
-    and \$`1<<31|1<<21|1<<17|1<<16`, %r11d     # avx512vl + avx512ifma + avx512dq + avx512f
-    cmp \$`1<<31|1<<21|1<<17|1<<16`, %r11d
-    cmove %r11d,%eax
-    ret
-.size   ossl_rsaz_avx512ifma_eligible, .-ossl_rsaz_avx512ifma_eligible
-___
-
 ###############################################################################
 # void ossl_rsaz_amm52x20_x1_ifma256(BN_ULONG *res,
 #                                    const BN_ULONG *a,

@@ -1253,13 +1253,25 @@ err:
 }
 
 
-/*
- * This is a variant of modular exponentiation optimization that does
- * parallel 2-primes exponentiation using 256-bit (AVX512VL) AVX512_IFMA ISA
- * in 52-bit binary redundant representation.
- * If such instructions are not available, or input data size is not supported,
- * it falls back to two BN_mod_exp_mont_consttime() calls.
- */
+// This is a variant of modular exponentiation optimization that does
+// parallel 2-primes exponentiation using 256-bit (AVX512VL)
+// AVX512_IFMA ISA in 52-bit binary redundant representation. If such
+// instructions are not available, or input data size is not
+// supported, it falls back to two BN_mod_exp_mont_consttime() calls.
+//
+// Computes `rr = a^p mod m` using montgomery multiplication.
+//
+// rr[i]      - Result
+// a[i]       - Base
+// p[i]       - Exponent
+// m[i]       - Modulus
+// in_mont[i] - Montgomery multiplication context
+// ctx        - Bignum context. Used if the MM contexts are NULL.
+//
+// Input radices should be either:
+//   a == 16, p == 16, m1 == 1024, or
+//   a == 24, p == 24, m1 == 1536, or
+//   a == 32, p == 32, m1 == 2048
 int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1,
                                  const BIGNUM *m1, const BN_MONT_CTX *in_mont1,
                                  BIGNUM *rr2, const BIGNUM *a2, const BIGNUM *p2,
@@ -1272,7 +1284,7 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
   BN_MONT_CTX *mont1 = NULL;
   BN_MONT_CTX *mont2 = NULL;
 
-  if (ossl_rsaz_avx512ifma_eligible() &&
+  if (CRYPTO_is_AVX512IFMA_capable() &&
     (((a1->width == 16) && (p1->width == 16) && (BN_num_bits(m1) == 1024) &&
       (a2->width == 16) && (p2->width == 16) && (BN_num_bits(m2) == 1024)) ||
      ((a1->width == 24) && (p1->width == 24) && (BN_num_bits(m1) == 1536) &&
@@ -1282,29 +1294,35 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
 
     int widthn = a1->width;
     /* Modulus bits of |m1| and |m2| are equal */
-    int mod_bits = BN_num_bits(m1);
 
-    if (!bn_wexpand(rr1, widthn))
+    if (!bn_wexpand(rr1, widthn)) {
         goto err;
-    if (!bn_wexpand(rr2, widthn))
+    }
+    if (!bn_wexpand(rr2, widthn)) {
         goto err;
-
+    }
+    
     /*  Ensure that montgomery contexts are initialized */
     if (in_mont1 == NULL) {
-      if ((mont1 = BN_MONT_CTX_new()) == NULL)
+      if ((mont1 = BN_MONT_CTX_new()) == NULL) {
         goto err;
-      if (!BN_MONT_CTX_set(mont1, m1, ctx))
+      }
+      if (!BN_MONT_CTX_set(mont1, m1, ctx)) {
         goto err;
+      }
       in_mont1 = mont1;
     }
     if (in_mont2 == NULL) {
-      if ((mont2 = BN_MONT_CTX_new()) == NULL)
+      if ((mont2 = BN_MONT_CTX_new()) == NULL) {
         goto err;
-      if (!BN_MONT_CTX_set(mont2, m2, ctx))
+      }
+      if (!BN_MONT_CTX_set(mont2, m2, ctx)) {
         goto err;
+      }
       in_mont2 = mont2;
     }
 
+    int mod_bits = BN_num_bits(m1);
     ret = ossl_rsaz_mod_exp_avx512_x2(rr1->d, a1->d, p1->d, m1->d,
                                       in_mont1->RR.d, in_mont1->n0[0],
                                       rr2->d, a2->d, p2->d, m2->d,
@@ -1319,22 +1337,21 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
     rr2->neg = 0;
     bn_set_minimal_width(rr2);
 
-    goto err;
+err:
+    if (mont2) {
+      BN_MONT_CTX_free(mont2);
+    }
+    if (mont1) {
+      BN_MONT_CTX_free(mont1);
+    }
 
   }
-#endif
+#else
 
   /* rr1 = a1^p1 mod m1 */
   ret = BN_mod_exp_mont_consttime(rr1, a1, p1, m1, ctx, in_mont1);
   /* rr2 = a2^p2 mod m2 */
   ret &= BN_mod_exp_mont_consttime(rr2, a2, p2, m2, ctx, in_mont2);
-
-#ifdef RSAZ_512_ENABLED
-err:
-  if (mont2)
-    BN_MONT_CTX_free(mont2);
-  if (mont1)
-    BN_MONT_CTX_free(mont1);
 #endif
 
   return ret;
