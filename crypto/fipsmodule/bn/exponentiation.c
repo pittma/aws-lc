@@ -1268,7 +1268,7 @@ err:
 // in_mont[i] - Montgomery multiplication context
 // ctx        - Bignum context.
 //
-// The bitwidth of each base, exponent, and modulus must match.
+// The width of each base, exponent, and modulus must match.
 int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1,
                                  const BIGNUM *m1, const BN_MONT_CTX *in_mont1,
                                  BIGNUM *rr2, const BIGNUM *a2, const BIGNUM *p2,
@@ -1279,12 +1279,12 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
 
 #ifdef RSAZ_512_ENABLED
   if (CRYPTO_is_AVX512IFMA_capable() &&
-     (((BN_num_bits(a1) == 1024) && (BN_num_bits(p1) == 1024) && (BN_num_bits(m1) == 1024) &&
-       (BN_num_bits(a2) == 1024) && (BN_num_bits(p2) == 1024) && (BN_num_bits(m2) == 1024)) ||
-      ((BN_num_bits(a1) == 1536) && (BN_num_bits(p1) == 1536) && (BN_num_bits(m1) == 1536) &&
-       (BN_num_bits(a2) == 1536) && (BN_num_bits(p2) == 1536) && (BN_num_bits(m2) == 1536)) ||
-      ((BN_num_bits(a1) == 2048) && (BN_num_bits(p1) == 2048) && (BN_num_bits(m1) == 2048) &&
-       (BN_num_bits(a2) == 2048) && (BN_num_bits(p2) == 2048) && (BN_num_bits(m2) == 2048)))) {
+     (((a1->width == 16) && (p1->width == 16) && (BN_num_bits(m1) == 1024) &&
+       (a2->width == 16) && (p2->width == 16) && (BN_num_bits(m2) == 1024)) ||
+      ((a1->width == 24) && (p1->width == 24) && (BN_num_bits(m1) == 1536) &&
+       (a2->width == 24) && (p2->width == 24) && (BN_num_bits(m2) == 1536)) ||
+      ((a1->width == 32) && (p1->width == 32) && (BN_num_bits(m1) == 2048) &&
+       (a2->width == 32) && (p2->width == 32) && (BN_num_bits(m2) == 2048)))) {
 
     int widthn = a1->width;
 
@@ -1304,12 +1304,27 @@ int BN_mod_exp_mont_consttime_x2(BIGNUM *rr1, const BIGNUM *a1, const BIGNUM *p1
 	return ret;
     }
 
+
+    if (!BN_is_odd(m1) || !BN_is_odd(m2)) {
+      OPENSSL_PUT_ERROR(BN, BN_R_CALLED_WITH_EVEN_MODULUS);
+      return 0;
+    }
+    if (m1->neg || m2->neg) {
+      OPENSSL_PUT_ERROR(BN, BN_R_NEGATIVE_NUMBER);
+      return 0;
+    }
+    if ((a1->neg || BN_ucmp(a1, m1) >= 0) ||
+	(a2->neg || BN_ucmp(a2, m2) >= 0)) {
+      OPENSSL_PUT_ERROR(BN, BN_R_INPUT_NOT_REDUCED);
+      return 0;
+    }
+
     int mod_bits = BN_num_bits(m1);
-    ret = ossl_rsaz_mod_exp_avx512_x2(rr1->d, a1->d, p1->d, m1->d,
-                                      in_mont1->RR.d, in_mont1->n0[0],
-                                      rr2->d, a2->d, p2->d, m2->d,
-                                      in_mont2->RR.d, in_mont2->n0[0],
-                                      mod_bits);
+    ret = rsaz_mod_exp_avx512_x2(rr1->d, a1->d, p1->d, m1->d,
+                                 in_mont1->RR.d, in_mont1->n0[0],
+                                 rr2->d, a2->d, p2->d, m2->d,
+                                 in_mont2->RR.d, in_mont2->n0[0],
+                                 mod_bits);
 
     rr1->width = widthn;
     rr1->neg = 0;

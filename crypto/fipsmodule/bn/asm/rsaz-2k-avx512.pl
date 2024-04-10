@@ -81,7 +81,7 @@ if ($avx512ifma>0) {{{
 ("%rdi","%rsi","%rdx","%rcx","%r8","%r9");
 
 ###############################################################################
-# void ossl_rsaz_amm52x20_x1_ifma256(BN_ULONG *res,
+# void rsaz_amm52x20_x1_ifma256(BN_ULONG *res,
 #                                    const BN_ULONG *a,
 #                                    const BN_ULONG *b,
 #                                    const BN_ULONG *m,
@@ -291,10 +291,10 @@ ___
 $code.=<<___;
 .text
 
-.globl  ossl_rsaz_amm52x20_x1_ifma256
-.type   ossl_rsaz_amm52x20_x1_ifma256,\@function,5
+.globl  rsaz_amm52x20_x1_ifma256
+.type   rsaz_amm52x20_x1_ifma256,\@function,5
 .align 32
-ossl_rsaz_amm52x20_x1_ifma256:
+rsaz_amm52x20_x1_ifma256:
 .cfi_startproc
     endbranch
     push    %rbx
@@ -309,7 +309,7 @@ ossl_rsaz_amm52x20_x1_ifma256:
 .cfi_push   %r14
     push    %r15
 .cfi_push   %r15
-.Lossl_rsaz_amm52x20_x1_ifma256_body:
+.Lrsaz_amm52x20_x1_ifma256_body:
 
     # Zeroing accumulators
     vpxord   $zero, $zero, $zero
@@ -362,10 +362,10 @@ $code.=<<___;
 .cfi_restore    %rbx
     lea  48(%rsp),%rsp
 .cfi_adjust_cfa_offset  -48
-.Lossl_rsaz_amm52x20_x1_ifma256_epilogue:
+.Lrsaz_amm52x20_x1_ifma256_epilogue:
     ret
 .cfi_endproc
-.size   ossl_rsaz_amm52x20_x1_ifma256, .-ossl_rsaz_amm52x20_x1_ifma256
+.size   rsaz_amm52x20_x1_ifma256, .-rsaz_amm52x20_x1_ifma256
 ___
 
 $code.=<<___;
@@ -380,7 +380,7 @@ $code.=<<___;
 ___
 
 ###############################################################################
-# void ossl_rsaz_amm52x20_x2_ifma256(BN_ULONG out[2][20],
+# void rsaz_amm52x20_x2_ifma256(BN_ULONG out[2][20],
 #                                    const BN_ULONG a[2][20],
 #                                    const BN_ULONG b[2][20],
 #                                    const BN_ULONG m[2][20],
@@ -390,10 +390,10 @@ ___
 $code.=<<___;
 .text
 
-.globl  ossl_rsaz_amm52x20_x2_ifma256
-.type   ossl_rsaz_amm52x20_x2_ifma256,\@function,5
+.globl  rsaz_amm52x20_x2_ifma256
+.type   rsaz_amm52x20_x2_ifma256,\@function,5
 .align 32
-ossl_rsaz_amm52x20_x2_ifma256:
+rsaz_amm52x20_x2_ifma256:
 .cfi_startproc
     endbranch
     push    %rbx
@@ -408,7 +408,7 @@ ossl_rsaz_amm52x20_x2_ifma256:
 .cfi_push   %r14
     push    %r15
 .cfi_push   %r15
-.Lossl_rsaz_amm52x20_x2_ifma256_body:
+.Lrsaz_amm52x20_x2_ifma256_body:
 
     # Zeroing accumulators
     vpxord   $zero, $zero, $zero
@@ -473,15 +473,15 @@ $code.=<<___;
 .cfi_restore    %rbx
     lea  48(%rsp),%rsp
 .cfi_adjust_cfa_offset  -48
-.Lossl_rsaz_amm52x20_x2_ifma256_epilogue:
+.Lrsaz_amm52x20_x2_ifma256_epilogue:
     ret
 .cfi_endproc
-.size   ossl_rsaz_amm52x20_x2_ifma256, .-ossl_rsaz_amm52x20_x2_ifma256
+.size   rsaz_amm52x20_x2_ifma256, .-rsaz_amm52x20_x2_ifma256
 ___
 }
 
 ###############################################################################
-# void ossl_extract_multiplier_2x20_win5(BN_ULONG *red_Y,
+# void extract_multiplier_2x20_win5(BN_ULONG *red_Y,
 #                                        const BN_ULONG red_table[1 << EXP_WIN_SIZE][2][20],
 #                                        int red_table_idx1, int red_table_idx2);
 #
@@ -503,9 +503,9 @@ $code.=<<___;
 .text
 
 .align 32
-.globl  ossl_extract_multiplier_2x20_win5
-.type   ossl_extract_multiplier_2x20_win5,\@abi-omnipotent
-ossl_extract_multiplier_2x20_win5:
+.globl  extract_multiplier_2x20_win5
+.type   extract_multiplier_2x20_win5,\@abi-omnipotent
+extract_multiplier_2x20_win5:
 .cfi_startproc
     endbranch
     vmovdqa64   .Lones(%rip), $ones         # broadcast ones
@@ -547,7 +547,7 @@ foreach (0..9) {
 $code.=<<___;
     ret
 .cfi_endproc
-.size   ossl_extract_multiplier_2x20_win5, .-ossl_extract_multiplier_2x20_win5
+.size   extract_multiplier_2x20_win5, .-extract_multiplier_2x20_win5
 ___
 $code.=<<___;
 .section .rodata
@@ -657,47 +657,39 @@ rsaz_def_handler:
 
 .section    .pdata
 .align  4
-    .rva    .LSEH_begin_ossl_rsaz_amm52x20_x1_ifma256
-    .rva    .LSEH_end_ossl_rsaz_amm52x20_x1_ifma256
-    .rva    .LSEH_info_ossl_rsaz_amm52x20_x1_ifma256
+    .rva    .LSEH_begin_rsaz_amm52x20_x1_ifma256
+    .rva    .LSEH_end_rsaz_amm52x20_x1_ifma256
+    .rva    .LSEH_info_rsaz_amm52x20_x1_ifma256
 
-    .rva    .LSEH_begin_ossl_rsaz_amm52x20_x2_ifma256
-    .rva    .LSEH_end_ossl_rsaz_amm52x20_x2_ifma256
-    .rva    .LSEH_info_ossl_rsaz_amm52x20_x2_ifma256
+    .rva    .LSEH_begin_rsaz_amm52x20_x2_ifma256
+    .rva    .LSEH_end_rsaz_amm52x20_x2_ifma256
+    .rva    .LSEH_info_rsaz_amm52x20_x2_ifma256
 
 .section    .xdata
 .align  8
-.LSEH_info_ossl_rsaz_amm52x20_x1_ifma256:
+.LSEH_info_rsaz_amm52x20_x1_ifma256:
     .byte   9,0,0,0
     .rva    rsaz_def_handler
-    .rva    .Lossl_rsaz_amm52x20_x1_ifma256_body,.Lossl_rsaz_amm52x20_x1_ifma256_epilogue
-.LSEH_info_ossl_rsaz_amm52x20_x2_ifma256:
+    .rva    .Lrsaz_amm52x20_x1_ifma256_body,.Lrsaz_amm52x20_x1_ifma256_epilogue
+.LSEH_info_rsaz_amm52x20_x2_ifma256:
     .byte   9,0,0,0
     .rva    rsaz_def_handler
-    .rva    .Lossl_rsaz_amm52x20_x2_ifma256_body,.Lossl_rsaz_amm52x20_x2_ifma256_epilogue
+    .rva    .Lrsaz_amm52x20_x2_ifma256_body,.Lrsaz_amm52x20_x2_ifma256_epilogue
 ___
 }
 }}} else {{{                # fallback for old assembler
 $code.=<<___;
 .text
-
-.globl  ossl_rsaz_avx512ifma_eligible
-.type   ossl_rsaz_avx512ifma_eligible,\@abi-omnipotent
-ossl_rsaz_avx512ifma_eligible:
-    xor     %eax,%eax
-    ret
-.size   ossl_rsaz_avx512ifma_eligible, .-ossl_rsaz_avx512ifma_eligible
-
-.globl  ossl_rsaz_amm52x20_x1_ifma256
-.globl  ossl_rsaz_amm52x20_x2_ifma256
-.globl  ossl_extract_multiplier_2x20_win5
-.type   ossl_rsaz_amm52x20_x1_ifma256,\@abi-omnipotent
-ossl_rsaz_amm52x20_x1_ifma256:
-ossl_rsaz_amm52x20_x2_ifma256:
-ossl_extract_multiplier_2x20_win5:
+.globl  rsaz_amm52x20_x1_ifma256
+.globl  rsaz_amm52x20_x2_ifma256
+.globl  extract_multiplier_2x20_win5
+.type   rsaz_amm52x20_x1_ifma256,\@abi-omnipotent
+rsaz_amm52x20_x1_ifma256:
+rsaz_amm52x20_x2_ifma256:
+extract_multiplier_2x20_win5:
     .byte   0x0f,0x0b    # ud2
     ret
-.size   ossl_rsaz_amm52x20_x1_ifma256, .-ossl_rsaz_amm52x20_x1_ifma256
+.size   rsaz_amm52x20_x1_ifma256, .-rsaz_amm52x20_x1_ifma256
 ___
 }}}
 
