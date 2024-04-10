@@ -5,22 +5,6 @@
 
 #if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_X86_64) && defined(__ELF__)
 .text	
-.extern	OPENSSL_ia32cap_P
-.hidden OPENSSL_ia32cap_P
-.globl	rsaz_avx512ifma_eligible
-.hidden rsaz_avx512ifma_eligible
-.type	rsaz_avx512ifma_eligible,@function
-.align	32
-rsaz_avx512ifma_eligible:
-	leaq	OPENSSL_ia32cap_P(%rip),%r11
-	movl	8(%r11),%r11d
-	xorl	%eax,%eax
-	andl	$2149777408,%r11d
-	cmpl	$2149777408,%r11d
-	cmovel	%r11d,%eax
-	.byte	0xf3,0xc3
-.size	rsaz_avx512ifma_eligible, .-rsaz_avx512ifma_eligible
-.text	
 
 .globl	rsaz_amm52x20_x1_ifma256
 .hidden rsaz_amm52x20_x1_ifma256
