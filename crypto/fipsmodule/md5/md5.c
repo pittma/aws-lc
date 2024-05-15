@@ -83,7 +83,9 @@ int MD5_Init(MD5_CTX *md5) {
   return 1;
 }
 
-#if defined(MD5_ASM)
+#if defined(MD5_ASM_AVX512)
+#define md5_block_data_order md5_block_avx512_data_order
+#elif defined(MD5_ASM)
 #define md5_block_data_order md5_block_asm_data_order
 #else
 static void md5_block_data_order(uint32_t *state, const uint8_t *data,
@@ -147,7 +149,7 @@ int MD5_Final(uint8_t out[MD5_DIGEST_LENGTH], MD5_CTX *c) {
     (a) += (b);                            \
   } while (0)
 
-#ifndef MD5_ASM
+#if !defined(MD5_ASM) && !defined(MD5_ASM_AVX512)
 #ifdef X
 #undef X
 #endif

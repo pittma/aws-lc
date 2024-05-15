@@ -22,7 +22,12 @@ extern "C" {
 #endif
 
 
-#if !defined(OPENSSL_NO_ASM) && \
+#if !defined(OPENSSL_NO_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX) && \
+    (defined(OPENSSL_X86_64) || defined(OPENSSL_X86) || defined(OPENSSL_AARCH64))
+#define MD5_ASM_AVX512
+extern void md5_block_avx512_data_order(uint32_t *state, const uint8_t *data,
+                                        size_t num);
+#elif !defined(OPENSSL_NO_ASM) \
     (defined(OPENSSL_X86_64) || defined(OPENSSL_X86) || defined(OPENSSL_AARCH64))
 #define MD5_ASM
 extern void md5_block_asm_data_order(uint32_t *state, const uint8_t *data,
