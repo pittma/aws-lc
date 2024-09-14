@@ -490,15 +490,7 @@ ___
 {
 # input parameters
 my ($out,$red_tbl,$red_tbl_idx1,$red_tbl_idx2)=$win64 ? ("%rcx","%rdx","%r8", "%r9") :  # Win64 order
-                                                        ("%rdi","%rsi","%rdx","%rcx");  # Unix order
-
-my ($t0,$t1,$t2,$t3,$t4,$t5) = map("%ymm$_", (0..5));
-my ($t6,$t7,$t8,$t9) = map("%ymm$_", (16..19));
-my ($tmp,$cur_idx,$idx1,$idx2,$ones) = map("%ymm$_", (20..24));
-
-my @t = ($t0,$t1,$t2,$t3,$t4,$t5,$t6,$t7,$t8,$t9);
-my $t0xmm = $t0;
-$t0xmm =~ s/%y/%x/;
+                                                        ("%rdi","%rsi","%edx","%ecx");  # Unix order
 
 $code.=<<___;
 .text
@@ -509,52 +501,63 @@ $code.=<<___;
 extract_multiplier_2x20_win5:
 .cfi_startproc
     endbranch
-    vmovdqa64   .Lones(%rip), $ones         # broadcast ones
-    vpbroadcastq    $red_tbl_idx1, $idx1
-    vpbroadcastq    $red_tbl_idx2, $idx2
-    leaq   `(1<<5)*2*20*8`($red_tbl), %rax  # holds end of the tbl
 
-    # zeroing t0..n, cur_idx
-    vpxor   $t0xmm, $t0xmm, $t0xmm
-    vmovdqa64   $t0, $cur_idx
-___
-foreach (1..9) {
-    $code.="vmovdqa64   $t0, $t[$_] \n";
-}
-$code.=<<___;
+    # Copy the table pointer into %r11 so we can mess with it.
+    movq $red_tbl, %r11
 
-.align 32
-.Lloop:
-    vpcmpq  \$0, $cur_idx, $idx1, %k1      # mask of (idx1 == cur_idx)
-    vpcmpq  \$0, $cur_idx, $idx2, %k2      # mask of (idx2 == cur_idx)
-___
-foreach (0..9) {
-    my $mask = $_<5?"%k1":"%k2";
-$code.=<<___;
-    vmovdqu64  `${_}*32`($red_tbl), $tmp     # load data from red_tbl
-    vpblendmq  $tmp, $t[$_], ${t[$_]}{$mask} # extract data when mask is not zero
-___
-}
-$code.=<<___;
-    vpaddq  $ones, $cur_idx, $cur_idx      # increment cur_idx
-    addq    \$`2*20*8`, $red_tbl
-    cmpq    $red_tbl, %rax
-    jne .Lloop
-___
-# store t0..n
-foreach (0..9) {
-    $code.="vmovdqu64   $t[$_], `${_}*32`($out) \n";
-}
-$code.=<<___;
+    # Calculate the offset for idx1
+    mov \$320, %r10d
+    imul $red_tbl_idx1, %r10d
+
+    # Bump the pointer
+    addq %r10, %r11
+
+    # Zero the temp register
+    vpxor %xmm0, %xmm0, %xmm0
+
+    # Copy to the result pointer
+    vmovdqu64 (%r11), %ymm0
+    vmovdqu64 %ymm0, ($out)
+    vmovdqu64 32(%r11), %ymm0
+    vmovdqu64 %ymm0, 32($out)
+    vmovdqu64 64(%r11), %ymm0
+    vmovdqu64 %ymm0, 64($out)
+    vmovdqu64 96(%r11), %ymm0
+    vmovdqu64 %ymm0, 96($out)
+    vmovdqu64 128(%r11), %ymm0
+    vmovdqu64 %ymm0, 128($out)
+
+    # Reset table pointer
+    subq %r10, %r11
+
+    # Calculate the offset for idx2
+    mov \$320, %r10d
+    imul $red_tbl_idx2, %r10d
+
+    # Bump the pointer
+    addq %r10, %r11
+
+    # Re-zero the temp register
+    vpxor %xmm0, %xmm0, %xmm0
+
+    # Copy to the result pointer
+    vmovdqu64 160(%r11), %ymm0
+    vmovdqu64 %ymm0, 160($out)
+    vmovdqu64 192(%r11), %ymm0
+    vmovdqu64 %ymm0, 192($out)
+    vmovdqu64 224(%r11), %ymm0
+    vmovdqu64 %ymm0, 224($out)
+    vmovdqu64 256(%r11), %ymm0
+    vmovdqu64 %ymm0, 256($out)
+    vmovdqu64 288(%r11), %ymm0
+    vmovdqu64 %ymm0, 288($out)
+    
     ret
 .cfi_endproc
 .size   extract_multiplier_2x20_win5, .-extract_multiplier_2x20_win5
-___
-$code.=<<___;
+
 .section .rodata
 .align 32
-.Lones:
-    .quad   1,1,1,1
 .Lzeros:
     .quad   0,0,0,0
 .text
