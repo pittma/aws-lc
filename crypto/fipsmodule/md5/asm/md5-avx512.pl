@@ -29,6 +29,7 @@ if ($avx512md5) {
   my $out = "%rdx";
 
   my $completeBlocks = "%r8";
+  my $tmp1 = "%zmm25";
 
   my $A = 0x67452301;
   my $B = 0xefcdab89;
@@ -52,15 +53,18 @@ if ($avx512md5) {
 
     $code .= <<___;
     vpternlogq $F,$b,$c,$d
-    add $a,$d
-    add $k,$d
-    add $i,$d
-    rol $s,$d
-    add $b,$d
+    vpaddq $a,$d
+    vpaddq $k,$d
+    vpaddq $i,$d
+    vbroadcasti32x4 $s,$tmp1
+    vprolq $tmp1,$d
+    vpaddq $b,$d
 ___
   }
 
-  # uint8_t *md5_x86_64_avx512(const uint8_t *data, size_t len, uint8_t out[MD5_DIGEST_LENGTH])
+  # uint8_t *md5_x86_64_avx512(const uint8_t *data,
+  #                            size_t len,
+  #                            uint8_t out[MD5_DIGEST_LENGTH]);
   $code .= <<___;
     .globl	md5_x86_64_avx512
     .hidden	md5_x86_64_avx512
@@ -69,10 +73,9 @@ ___
     md5_x86_64_avx512:
     .cfi_startproc
     endbranch
-    mov $length,$completeBlocks
-    shr \$3,$completeBlocks
+    mov	$length,$completeBlocks
+    shr	\$3,$completeBlocks
 
     .L_main_loop:
-    
 ___
 }
