@@ -30,17 +30,26 @@ if ($avx512md5) {
   my $D = 0x10325476;
 
   my @T = (
-      0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-      0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-      0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-      0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-      0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-      0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-      0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-      0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+      '\$0xd76aa478', '\$0xe8c7b756', '\$0x242070db', '\$0xc1bdceee',
+      '\$0xf57c0faf', '\$0x4787c62a', '\$0xa8304613', '\$0xfd469501',
+      '\$0x698098d8', '\$0x8b44f7af', '\$0xffff5bb1', '\$0x895cd7be',
+      '\$0x6b901122', '\$0xfd987193', '\$0xa679438e', '\$0x49b40821',
+      '\$0xf61e2562', '\$0xc040b340', '\$0x265e5a51', '\$0xe9b6c7aa',
+      '\$0xd62f105d', '\$0x02441453', '\$0xd8a1e681', '\$0xe7d3fbc8',
+      '\$0x21e1cde6', '\$0xc33707d6', '\$0xf4d50d87', '\$0x455a14ed',
+      '\$0xa9e3e905', '\$0xfcefa3f8', '\$0x676f02d9', '\$0x8d2a4c8a',
+      '\$0xfffa3942', '\$0x8771f681', '\$0x6d9d6122', '\$0xfde5380c',
+      '\$0xa4beea44', '\$0x4bdecfa9', '\$0xf6bb4b60', '\$0xbebfbc70',
+      '\$0x289b7ec6', '\$0xeaa127fa', '\$0xd4ef3085', '\$0x04881d05',
+      '\$0xd9d4d039', '\$0xe6db99e5', '\$0x1fa27cf8', '\$0xc4ac5665',
+      '\$0xf4292244', '\$0x432aff97', '\$0xab9423a7', '\$0xfc93a039',
+      '\$0x655b59c3', '\$0x8f0ccc92', '\$0xffeff47d', '\$0x85845dd1',
+      '\$0x6fa87e4f', '\$0xfe2ce6e0', '\$0xa3014314', '\$0x4e0811a1',
+      '\$0xf7537e82', '\$0xbd3af235', '\$0x2ad7d2bb', '\$0xeb86d391',
   );
 
-  my $msg = "%rdi";
+  my $data = "%rdi";
+  my $len = "%rsi";
 
   my $a = "%xmm1";
   my $b = "%xmm2";
@@ -54,7 +63,7 @@ if ($avx512md5) {
 
   sub md5_step {
     my ($dst, $a, $b, $c, $d, $off, $rot, $t, $imm8) = @_;
-  
+
     $code .= <<___;
     vpternlogd	$imm8, $b, $c, $d, $dst  # dst = f(b, c, d)
     vpaddd	$a, $dst, $dst           # dst += a
@@ -82,11 +91,128 @@ ___
 
     md5_step($dst, $a, $b, $c, $off, $rot, $t, "\$0x96");
   }
-  
+
   sub round4_op {
     my ($dst, $a, $b, $c, $d, $off, $rot, $t) = @_;
 
     md5_step($dst, $a, $b, $c, $off, $rot, $t, "\$0x63");
+  }
+
+  sub one_loop {
+
+    $code .= <<___;
+    vmov	$a, $pa
+    vmov	$b, $pb
+    vmov	$c, $pc
+    vmov	$d, $pd
+___
+
+    # Round 1
+    # [ABCD  0  7  1]  [DABC  1 12  2]  [CDAB  2 17  3]  [BCDA  3 22  4]
+    round1_op($a, $a, $b, $c, $d, 0, 7,  $T[0]);
+    round1_op($d, $d, $a, $b, $c, 1, 12, $T[1]);
+    round1_op($c, $c, $d, $a, $b, 2, 17, $T[2]);
+    round1_op($b, $b, $c, $d, $a, 3, 22, $T[3]);
+
+    # [ABCD  4  7  5]  [DABC  5 12  6]  [CDAB  6 17  7]  [BCDA  7 22  8]
+    round1_op($a, $a, $b, $c, $d, 4, 7, $T[4]);
+    round1_op($d, $d, $a, $b, $c, 5, 12, $T[5]);
+    round1_op($c, $c, $d, $a, $b, 6, 17, $T[6]);
+    round1_op($b, $b, $c, $d, $a, 7, 22, $T[7]);
+
+    # [ABCD  8  7  9]  [DABC  9 12 10]  [CDAB 10 17 11]  [BCDA 11 22 12]
+    round1_op($a, $a, $b, $c, $d, 8, 7, $T[8]);
+    round1_op($d, $d, $a, $b, $c, 9, 12, $T[9]);
+    round1_op($c, $c, $d, $a, $b, 10, 17, $T[10]);
+    round1_op($b, $b, $c, $d, $a, 11, 22, $T[11]);
+
+    # [ABCD 12  7 13]  [DABC 13 12 14]  [CDAB 14 17 15]  [BCDA 15 22 16]
+    round1_op($a, $a, $b, $c, $d, 12, 7, $T[12]);
+    round1_op($d, $d, $a, $b, $c, 13, 12, $T[13]);
+    round1_op($c, $c, $d, $a, $b, 14, 17, $T[14]);
+    round1_op($b, $b, $c, $d, $a, 15, 22, $T[15]);
+
+    # Round 2
+    # [ABCD  1  5 17]  [DABC  6  9 18]  [CDAB 11 14 19]  [BCDA  0 20 20]
+    round2_op($a, $a, $b, $c, $d, 1, 5, $T[16]);
+    round2_op($d, $d, $a, $b, $c, 6, 9, $T[17]);
+    round2_op($c, $c, $d, $a, $b, 11, 14, $T[18]);
+    round2_op($b, $b, $c, $d, $a, 0, 20, $T[19]);
+
+    # [ABCD  5  5 21]  [DABC 10  9 22]  [CDAB 15 14 23]  [BCDA  4 20 24]
+    round2_op($a, $a, $b, $c, $d, 5, 5, $T[20]);
+    round2_op($d, $d, $a, $b, $c, 10, 9, $T[21]);
+    round2_op($d, $c, $d, $a, $b, 15, 14, $T[22]);
+    round2_op($b, $b, $c, $d, $a, 4, 20, $T[23]);
+
+    # [ABCD  9  5 25]  [DABC 14  9 26]  [CDAB  3 14 27]  [BCDA  8 20 28]
+    round2_op($a, $a, $b, $c, $d, 9, 5, $T[24]);
+    round2_op($d, $d, $a, $b, $c, 14, 9, $T[25]);
+    round2_op($c, $c, $d, $a, $b, 3, 14, $T[26]);
+    round2_op($b, $b, $c, $d, $a, 8, 20, $T[27]);
+
+    # [ABCD 13  5 29]  [DABC  2  9 30]  [CDAB  7 14 31]  [BCDA 12 20 32]
+    round2_op($a, $a, $b, $c, $d, 13, 5, $T[28]);
+    round2_op($d, $d, $a, $b, $c, 2, 9, $T[29]);
+    round2_op($c, $c, $d, $a, $b, 7, 14, $T[30]);
+    round2_op($b, $b, $c, $d, $a, 12, 20, $T[31]);
+
+    # Round 3
+    # [ABCD  5  4 33]  [DABC  8 11 34]  [CDAB 11 16 35]  [BCDA 14 23 36]
+    round3_op($a, $a, $b, $c, $d, 5, 4, $T[32]);
+    round3_op($d, $d, $a, $b, $c, 8, 11, $T[33]);
+    round3_op($c, $c, $d, $a, $b, 11, 16, $T[34]);
+    round3_op($b, $b, $c, $d, $a, 14, 23, $T[35]);
+
+    # [ABCD  1  4 37]  [DABC  4 11 38]  [CDAB  7 16 39]  [BCDA 10 23 40]
+    round3_op($a, $a, $b, $c, $d, 1, 4, $T[36]);
+    round3_op($d, $d, $a, $b, $c, 4, 11, $T[37]);
+    round3_op($c, $c, $d, $a, $b, 7, 16, $T[38]);
+    round3_op($b, $b, $c, $d, $a, 10, 23, $T[39]);
+
+    # [ABCD 13  4 41]  [DABC  0 11 42]  [CDAB  3 16 43]  [BCDA  6 23 44]
+    round3_op($a, $a, $b, $c, $d, 13, 4, $T[40]);
+    round3_op($d, $d, $a, $b, $c, 0, 11, $T[41]);
+    round3_op($c, $c, $d, $a, $b, 3, 16, $T[42]);
+    round3_op($b, $b, $c, $d, $a, 6, 23, $T[43]);
+
+    # [ABCD  9  4 45]  [DABC 12 11 46]  [CDAB 15 16 47]  [BCDA  2 23 48]
+    round3_op($a, $a, $b, $c, $d, 9, 4, $T[44]);
+    round3_op($d, $d, $a, $b, $c, 12, 11, $T[45]);
+    round3_op($c, $c, $d, $a, $b, 15, 16, $T[46]);
+    round3_op($b, $b, $c, $d, $a, 2, 23, $T[47]);
+
+    # Round 4
+    # [ABCD  0  6 49]  [DABC  7 10 50]  [CDAB 14 15 51]  [BCDA  5 21 52]
+    round4_op($a, $a, $b, $c, $d, 0, 6, $T[48]);
+    round4_op($d, $d, $a, $b, $c, 7, 10, $T[49]);
+    round4_op($c, $c, $d, $a, $b, 14, 15, $T[50]);
+    round4_op($b, $b, $c, $d, $a, 5, 21, $T[51]);
+
+    # [ABCD 12  6 53]  [DABC  3 10 54]  [CDAB 10 15 55]  [BCDA  1 21 56]
+    round4_op($a, $a, $b, $c, $d, 12, 6, $T[52]);
+    round4_op($d, $d, $a, $b, $c, 3, 10, $T[53]);
+    round4_op($c, $c, $d, $a, $b, 10, 15, $T[54]);
+    round4_op($b, $b, $c, $d, $a, 1, 21, $T[55]);
+
+    # [ABCD  8  6 57]  [DABC 15 10 58]  [CDAB  6 15 59]  [BCDA 13 21 60]
+    round4_op($a, $a, $b, $c, $d, 8, 6, $T[56]);
+    round4_op($d, $d, $a, $b, $c, 15, 10, $T[57]);
+    round4_op($c, $c, $d, $a, $b, 6, 15, $T[58]);
+    round4_op($b, $b, $c, $d, $a, 13, 21, $T[59]);
+
+    # [ABCD  4  6 61]  [DABC 11 10 62]  [CDAB  2 15 63]  [BCDA  9 21 64]
+    round4_op($a, $a, $b, $c, $d, 4, 6, $T[60]);
+    round4_op($d, $d, $a, $b, $c, 11, 10, $T[61]);
+    round4_op($c, $c, $d, $a, $b, 2, 15, $T[62]);
+    round4_op($b, $b, $c, $d, $a, 9, 21, $T[63]);
+
+    $code .= <<___;
+    vpaddd	$a, $pa, $a
+    vpaddd	$b, $pb, $b
+    vpaddd	$c, $pc, $c
+    vpaddd	$d, $pd, $d
+___
   }
 
   # uint8_t *md5_x86_64_avx512(const uint8_t *data,
@@ -107,117 +233,52 @@ ___
   mov	%rsp, %rbp
   sub	\$128, %rsp
 
-  .L_main_loop:
-  vmovd	$a, $pa
-  vmovd	$b, $pb
-  vmovd	$c, $pc
-  vmovd	$d, $pd
+  mov	$len, %r8
+  shl	\$3, %r8 # bit length
+
+  cmp	\$56, $len
+  jl	.L_final_block_is_final
+  jmp	.L_need_a_bonus_block
+
+  .L_final_block_is_final:
+  # copy final partial block to the stack.
+  vpxorq	%zmm9, %zmm9, %zmm9
+  mov	$len, %rcx
+  mov	\$1, %r9
+  shlq	%cl, %r9
+  sub	\$1, %r9
+  kmovq	%r9, %k1
+  vmovdqu8	($data), %zmm9{%k1}
+  vmovdqu8	%zmm9, (%rsp){%k1}
+
+  # handle padding
+  add	$len, %rsp
+  movq	\$0x80,(%rsp)
+  add	\$1, %rsp
+  vpxorq	%zmm9, %zmm9, %zmm9
+
+  sub	\$55, $len
+  cmp	\$0, $len
+  je	.L_append_le_length
+  mov	$len, %rcx
+  mov	\$1, %r9
+  shlq	%cl, %r9
+  sub	\$1, %r9
+  kmovq	%r9, %k1
+  vmovdqu8	%zmm9, (%rsp){%k1}
+  add	$len,%rsp
+
+  .L_append_le_length:
+  mov	%r8, (%rsp)
+  mov	%rbp, %rsp
+  pop	%rbp
+  .L_need_a_bonus_block:
+  ret
+  .cfi_endproc
 ___
- 
-  # Round 1
-  # [ABCD  0  7  1]  [DABC  1 12  2]  [CDAB  2 17  3]  [BCDA  3 22  4]
-  round1_op($a, $a, $b, $c, $d, 0, 7,  $T[0]);
-  round1_op($d, $d, $a, $b, $c, 1, 12, $T[1]);
-  round1_op($c, $c, $d, $a, $b, 2, 17, $T[2]);
-  round1_op($b, $b, $c, $d, $a, 3, 22, $T[3]);
 
-  # [ABCD  4  7  5]  [DABC  5 12  6]  [CDAB  6 17  7]  [BCDA  7 22  8]
-  round1_op($a, $a, $b, $c, $d, 4, 7, $T[4]);
-  round1_op($d, $d, $a, $b, $c, 5, 12, $T[5]);
-  round1_op($c, $c, $d, $a, $b, 6, 17, $T[6]);
-  round1_op($b, $b, $c, $d, $a, 7, 22, $T[7]);
 
-  # [ABCD  8  7  9]  [DABC  9 12 10]  [CDAB 10 17 11]  [BCDA 11 22 12]
-  round1_op($a, $a, $b, $c, $d, 8, 7, $T[8]);
-  round1_op($d, $d, $a, $b, $c, 9, 12, $T[9]);
-  round1_op($c, $c, $d, $a, $b, 10, 17, $T[10]);
-  round1_op($b, $b, $c, $d, $a, 11, 22, $T[11]);
+  print $code;
 
-  # [ABCD 12  7 13]  [DABC 13 12 14]  [CDAB 14 17 15]  [BCDA 15 22 16]
-  round1_op($a, $a, $b, $c, $d, 12, 7, $T[12]);
-  round1_op($d, $d, $a, $b, $c, 13, 12, $T[13]);
-  round1_op($c, $c, $d, $a, $b, 14, 17, $T[14]);
-  round1_op($b, $b, $c, $d, $a, 15, 22, $T[15]);
-
-  # Round 2
-  # [ABCD  1  5 17]  [DABC  6  9 18]  [CDAB 11 14 19]  [BCDA  0 20 20]
-  round2_op($a, $a, $b, $c, $d, 1, 5, $T[16]);
-  round2_op($d, $d, $a, $b, $c, 6, 9, $T[17]);
-  round2_op($c, $c, $d, $a, $b, 11, 14, $T[18]);
-  round2_op($b, $b, $c, $d, $a, 0, 20, $T[19]);
-
-  # [ABCD  5  5 21]  [DABC 10  9 22]  [CDAB 15 14 23]  [BCDA  4 20 24]
-  round2_op($a, $a, $b, $c, $d, 5, 5, $T[20]);
-  round2_op($d, $d, $a, $b, $c, 10, 9, $T[21]);
-  round2_op($d, $c, $d, $a, $b, 15, 14, $T[22]);
-  round2_op($b, $b, $c, $d, $a, 4, 20, $T[23]);
-
-  # [ABCD  9  5 25]  [DABC 14  9 26]  [CDAB  3 14 27]  [BCDA  8 20 28]
-  round2_op($a, $a, $b, $c, $d, 9, 5, $T[24]);
-  round2_op($d, $d, $a, $b, $c, 14, 9, $T[25]);
-  round2_op($c, $c, $d, $a, $b, 3, 14, $T[26]);
-  round2_op($b, $b, $c, $d, $a, 8, 20, $T[27]);
-
-  # [ABCD 13  5 29]  [DABC  2  9 30]  [CDAB  7 14 31]  [BCDA 12 20 32]
-  round2_op($a, $a, $b, $c, $d, 13, 5, $T[28]);
-  round2_op($d, $d, $a, $b, $c, 2, 9, $T[29]);
-  round2_op($c, $c, $d, $a, $b, 7, 14, $T[30]);
-  round2_op($b, $b, $c, $d, $a, 12, 20, $T[31]);
-
-  # Round 3
-  # [ABCD  5  4 33]  [DABC  8 11 34]  [CDAB 11 16 35]  [BCDA 14 23 36]
-  round3_op($a, $a, $b, $c, $d, 5, 4, $T[32]);
-  round3_op($d, $d, $a, $b, $c, 8, 11, $T[33]);
-  round3_op($c, $c, $d, $a, $b, 11, 16, $T[34]);
-  round3_op($b, $b, $c, $d, $a, 14, 23, $T[35]);
-
-  # [ABCD  1  4 37]  [DABC  4 11 38]  [CDAB  7 16 39]  [BCDA 10 23 40]
-  round3_op($a, $a, $b, $c, $d, 1, 4, $T[36]);
-  round3_op($d, $d, $a, $b, $c, 4, 11, $T[37]);
-  round3_op($c, $c, $d, $a, $b, 7, 16, $T[38]);
-  round3_op($b, $b, $c, $d, $a, 10, 23, $T[39]);
-
-  # [ABCD 13  4 41]  [DABC  0 11 42]  [CDAB  3 16 43]  [BCDA  6 23 44]
-  round3_op($a, $a, $b, $c, $d, 13, 4, $T[40]);
-  round3_op($d, $d, $a, $b, $c, 0, 11, $T[41]);
-  round3_op($c, $c, $d, $a, $b, 3, 16, $T[42]);
-  round3_op($b, $b, $c, $d, $a, 6, 23, $T[43]);
-
-  # [ABCD  9  4 45]  [DABC 12 11 46]  [CDAB 15 16 47]  [BCDA  2 23 48]
-  round3_op($a, $a, $b, $c, $d, 9, 4, $T[44]);
-  round3_op($d, $d, $a, $b, $c, 12, 11, $T[45]);
-  round3_op($c, $c, $d, $a, $b, 15, 16, $T[46]);
-  round3_op($b, $b, $c, $d, $a, 2, 23, $T[47]);
-
-  # Round 4
-  # [ABCD  0  6 49]  [DABC  7 10 50]  [CDAB 14 15 51]  [BCDA  5 21 52]
-  round4_op($a, $a, $b, $c, $d, 0, 6, $T[48]);
-  round4_op($d, $d, $a, $b, $c, 7, 10, $T[49]);
-  round4_op($c, $c, $d, $a, $b, 14, 15, $T[50]);
-  round4_op($b, $b, $c, $d, $a, 5, 21, $T[51]);
-
-  # [ABCD 12  6 53]  [DABC  3 10 54]  [CDAB 10 15 55]  [BCDA  1 21 56]
-  round4_op($a, $a, $b, $c, $d, 12, 6, $T[52]);
-  round4_op($d, $d, $a, $b, $c, 3, 10, $T[53]);
-  round4_op($c, $c, $d, $a, $b, 10, 15, $T[54]);
-  round4_op($b, $b, $c, $d, $a, 1, 21, $T[55]);
-
-  # [ABCD  8  6 57]  [DABC 15 10 58]  [CDAB  6 15 59]  [BCDA 13 21 60]
-  round4_op($a, $a, $b, $c, $d, 8, 6, $T[56]);
-  round4_op($d, $d, $a, $b, $c, 15, 10, $T[57]);
-  round4_op($c, $c, $d, $a, $b, 6, 15, $T[58]);
-  round4_op($b, $b, $c, $d, $a, 13, 21, $T[59]);
-
-  # [ABCD  4  6 61]  [DABC 11 10 62]  [CDAB  2 15 63]  [BCDA  9 21 64]
-  round4_op($a, $a, $b, $c, $d, 4, 6, $T[60]);
-  round4_op($d, $d, $a, $b, $c, 11, 10, $T[61]);
-  round4_op($c, $c, $d, $a, $b, 2, 15, $T[62]);
-  round4_op($b, $b, $c, $d, $a, 9, 21, $T[63]);
-
-  $code .= <<___;
-  vpaddd	$a, $pa, $a
-  vpaddd	$b, $pb, $b
-  vpaddd	$c, $pc, $c
-  vpaddd	$d, $pd, $d
-___
+  close STDOUT or die "error closing STDOUT: $!";
 }
