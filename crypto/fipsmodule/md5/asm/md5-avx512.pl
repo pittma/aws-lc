@@ -215,18 +215,17 @@ ___
 ___
   }
 
-  # uint8_t *md5_x86_64_avx512(const uint8_t *data,
-  #                            size_t len,
-  #                            uint8_t out[MD5_DIGEST_LENGTH]);
+  # int md5_x86_64_avx512_asm(const uint8_t *data,
+  #                       size_t len,
+  #                       uint8_t out[MD5_DIGEST_LENGTH]);
   $code .= <<___;
   .text
   .align 32
 
-  .globl	md5_x86_64_avx512
-  .hidden	md5_x86_64_avx512
-  .type	md5_x86_64_avx512,\@function,3
+  .globl	md5_x86_64_avx512_asm
+  .type	md5_x86_64_avx512_asm,\@function,3
   .align	32
-  md5_x86_64_avx512:
+  md5_x86_64_avx512_asm:
   .cfi_startproc
   endbranch
   push	%rbp
@@ -257,24 +256,26 @@ ___
   add	\$1, %rsp
   vpxorq	%zmm9, %zmm9, %zmm9
 
-  sub	\$55, $len
-  cmp	\$0, $len
+  movq \$55, %rcx
+  sub	$len, %rcx
+  cmp	\$0, %rcx
   je	.L_append_le_length
-  mov	$len, %rcx
   mov	\$1, %r9
   shlq	%cl, %r9
   sub	\$1, %r9
   kmovq	%r9, %k1
   vmovdqu8	%zmm9, (%rsp){%k1}
-  add	$len,%rsp
+  add	%rcx,%rsp
 
   .L_append_le_length:
   mov	%r8, (%rsp)
   mov	%rbp, %rsp
   pop	%rbp
   .L_need_a_bonus_block:
+  movq \$1, %rax
   ret
   .cfi_endproc
+  .size md5_x86_64_avx512_asm,.-md5_x86_64_avx512_asm
 ___
 
 
