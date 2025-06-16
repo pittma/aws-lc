@@ -52,6 +52,10 @@ extern void md5_block_asm_data_order(uint32_t *state, const uint8_t *data,
                                      size_t num);
 #endif
 
+extern int md5_x86_64_avx512(const uint8_t *data,
+                             size_t len,
+                             uint8_t out[MD5_DIGEST_LENGTH]);
+
 
 #if defined(__cplusplus)
 }  // extern "C"

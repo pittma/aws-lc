@@ -94,16 +94,6 @@ OPENSSL_EXPORT uint8_t *MD5(const uint8_t *data, size_t len,
 OPENSSL_EXPORT void MD5_Transform(MD5_CTX *md5,
                                   const uint8_t block[MD5_CBLOCK]);
 
-// TODO(pittma): this doesn't need to be exported, I'm just exporting it so I
-// can run tests on it.
-int md5_x86_64_avx512_asm(const uint8_t *data,
-                                     size_t len,
-                                     uint8_t out[MD5_DIGEST_LENGTH]);
-
-OPENSSL_EXPORT int md5_x86_64_avx512(const uint8_t *data,
-                                     size_t len,
-                                     uint8_t out[MD5_DIGEST_LENGTH]);
-
 struct md5_state_st {
   uint32_t h[4];
   uint32_t Nl, Nh;

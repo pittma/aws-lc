@@ -66,11 +66,11 @@
 
 
 uint8_t *MD5(const uint8_t *data, size_t len, uint8_t out[MD5_DIGEST_LENGTH]) {
-  MD5_CTX ctx;
-  MD5_Init(&ctx);
-  MD5_Update(&ctx, data, len);
-  MD5_Final(out, &ctx);
-
+  md5_x86_64_avx512(data, len, out);
+  //MD5_CTX ctx;
+  //MD5_Init(&ctx);
+  //MD5_Update(&ctx, data, len);
+  //MD5_Final(out, &ctx);
   return out;
 }
 
@@ -102,13 +102,6 @@ int MD5_Init_from_state(MD5_CTX *md5, const uint8_t h[MD5_CHAINING_LENGTH],
   md5->Nl = n & 0xffffffff;
 
   return 1;
-}
-
-
-int md5_x86_64_avx512(const uint8_t *data,
-                      size_t len,
-                      uint8_t out[MD5_DIGEST_LENGTH]) {
-  return md5_x86_64_avx512_asm(data, len, out);
 }
 
 #if defined(MD5_ASM)
