@@ -24,11 +24,6 @@ open OUT,"| \"$^X\" \"$xlate\" $flavour \"$output\"";
 
 if ($avx512md5) {
 
-  my $A = 0x67452301;
-  my $B = 0xefcdab89;
-  my $C = 0x98badcfe;
-  my $D = 0x10325476;
-
   my $data = "%rdi";
   my $len = "%rsi";
   my $out = "%rdx";
@@ -46,9 +41,11 @@ if ($avx512md5) {
   sub md5_step {
     my ($src, $a, $b, $c, $d, $off, $rot, $t, $imm8) = @_;
 
+    # TODO(pittma): At the cost of another register, we can add t and k
+    # together, and then combine results which may get us better ILP.
     $code .= <<___;
     vmovdqa	$b, %xmm9
-    vpternlogd	$imm8, $c, $d, %xmm9       # dst = f(b, c, d)
+    vpternlogd	$imm8, $d, $c, %xmm9       # dst = f(b, c, d)
     vpaddd	$a, %xmm9, %xmm9               # dst += a
     vpaddd	.L_T+4*$t(%rip), %xmm9, %xmm9  # dst += T[i]
     vpaddd	$off*4($src), %xmm9, %xmm9     # dst += k[i]
@@ -218,7 +215,17 @@ ___
   mov	%rsp, %rbp
   sub	\$128, %rsp
 
+  mov	\$0xf, %rcx
+  kmovq	%rcx, %k1
+  vmovdqu8	.L_A(%rip), $a {%k1}
+  vmovdqu8	.L_B(%rip), $b {%k1}
+  vmovdqu8	.L_C(%rip), $c {%k1}
+  vmovdqu8	.L_D(%rip), $d {%k1}
   vpxord	%xmm9, %xmm9, %xmm9
+
+  # special case of message being < 64 bytes in length
+  cmp	\$64, $len
+  jl	.L_final_blocks
 
   .L_main_loop:
 ___
@@ -231,6 +238,7 @@ ___
   cmp \$64, $len
   jg .L_main_loop
 
+  .L_final_blocks:
   mov	$len, %r8
   shl	\$3, %r8 # bit length
 
@@ -265,8 +273,8 @@ ___
 
   .L_append_le_length:
   mov	%r8, (%rsp)
-  mov	\$64, %r8
-  mov	\$128, %r10
+  mov	\$56, %r8
+  mov	\$120, %r10
   cmp	\$56, $len
   cmovg	%r10, %r8
   sub	%r8, %rsp
@@ -275,6 +283,15 @@ ___
   one_round('%rsp');
 
   $code .= <<___;
+  cmp	\$64, %r8
+  je	.L_done
+  add	\$64, %rsp
+___
+
+  one_round('%rsp');
+
+  $code .= <<___;
+  .L_done:
   vmovd	$a, 4*0($out)
   vmovd	$b, 4*1($out)
   vmovd	$c, 4*2($out)
@@ -290,6 +307,15 @@ ___
 
   .section .rodata
   .align 32
+
+  .L_A:
+    .long 0x67452301
+  .L_B:
+    .long 0xefcdab89
+  .L_C:
+    .long 0x98badcfe
+  .L_D:
+    .long 0x10325476
 
   .L_T:
       .long 0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee
