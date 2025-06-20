@@ -77,7 +77,7 @@ ___
   sub round4_op {
     my ($src, $a, $b, $c, $d, $off, $rot, $t) = @_;
 
-    md5_step($src, $a, $b, $c, $d, $off, $rot, $t, "\$0x63");
+    md5_step($src, $a, $b, $c, $d, $off, $rot, $t, "\$0x39");
   }
 
   sub one_round {
@@ -271,6 +271,7 @@ ___
   vmovdqu8	%zmm9, (%rsp){%k1}
   add	%rcx,%rsp
 
+  # TODO(pittma): possible improvement here too w/r/t chained registers.
   .L_append_le_length:
   mov	%r8, (%rsp)
   mov	\$56, %r8
@@ -283,7 +284,7 @@ ___
   one_round('%rsp');
 
   $code .= <<___;
-  cmp	\$64, %r8
+  cmp	\$56, %r8
   je	.L_done
   add	\$64, %rsp
 ___
