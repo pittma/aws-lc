@@ -44,15 +44,14 @@ if ($avx512md5) {
     # TODO(pittma): At the cost of another register, we can add t and k
     # together, and then combine results which may get us better ILP.
     $code .= <<___;
-    vmovdqa	$b, %xmm9
-    vpternlogd	$imm8, $d, $c, %xmm9       # dst = f(b, c, d)
-    vpaddd	$a, %xmm9, %xmm9               # dst += a
-    vpaddd	.L_T+4*$t(%rip), %xmm9, %xmm9  # dst += T[i]
-    vpaddd	$off*4($src), %xmm9, %xmm9     # dst += k[i]
-    vprold	\$$rot, %xmm9, %xmm9           # dst = ROTL(dst, s)
-    vpaddd	$b, %xmm9, %xmm9               # dst += b
-    vmovdqa	%xmm9, $a
-
+    vmovdqa	$b, %xmm9                     # preserve b
+    vpternlogd	$imm8, $d, $c, %xmm9      # f(b, c, d)
+    vmovd	.L_T+4*$t(%rip), %xmm10
+    vpaddd	$a, %xmm9, %xmm9              # f(b, c, d)  + a
+    vpaddd	$off*4($src), %xmm10, %xmm10  # T[i] + k[i]
+    vpaddd	%xmm9, %xmm10, %xmm9          # (T[i] + k[i]) + (f(b, c, d) + a)
+    vprold	\$$rot, %xmm9, %xmm9          # tmp <<< s
+    vpaddd	$b, %xmm9, $a                 # b + (tmp <<< s)
 ___
   }
 
@@ -215,18 +214,17 @@ ___
   mov	%rsp, %rbp
   sub	\$128, %rsp
 
-  mov	\$0xf, %rcx
-  kmovq	%rcx, %k1
-  vmovdqu8	.L_A(%rip), $a {%k1}
-  vmovdqu8	.L_B(%rip), $b {%k1}
-  vmovdqu8	.L_C(%rip), $c {%k1}
-  vmovdqu8	.L_D(%rip), $d {%k1}
+  vmovd	.L_A(%rip), $a
+  vmovd	.L_B(%rip), $b
+  vmovd	.L_C(%rip), $c
+  vmovd	.L_D(%rip), $d
   vpxord	%xmm9, %xmm9, %xmm9
 
   # special case of message being < 64 bytes in length
   cmp	\$64, $len
   jl	.L_final_blocks
 
+  .align 32
   .L_main_loop:
 ___
 
