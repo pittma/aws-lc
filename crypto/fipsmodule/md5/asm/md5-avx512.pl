@@ -213,6 +213,10 @@ ___
   push	%rbp
   mov	%rsp, %rbp
   sub	\$128, %rsp
+  and	\$0xffffffffffffffc0,%rsp
+
+  # preserve initial length
+  mov	$len, %r8
 
   vmovd	.L_A(%rip), $a
   vmovd	.L_B(%rip), $b
@@ -237,7 +241,6 @@ ___
   jg .L_main_loop
 
   .L_final_blocks:
-  mov	$len, %r8
   shl	\$3, %r8 # bit length
 
   # copy final block to the stack.
@@ -250,14 +253,14 @@ ___
   vmovdqu8	($data), %zmm9{%k1}
   vmovdqu8	%zmm9, (%rsp){%k1}
   add	$len, %rsp
+  movq	\$0x80,(%rsp)
+  add	\$1, %rsp
 
   # handle padding
   mov \$55, %rcx
   mov \$119, %r10
   cmp	\$56, $len
   cmovg	%r10, %rcx
-  movq	\$0x80,(%rsp)
-  add	\$1, %rsp
   vpxorq	%zmm9, %zmm9, %zmm9
   sub	$len, %rcx
   cmp	\$0, %rcx
@@ -274,7 +277,7 @@ ___
   mov	%r8, (%rsp)
   mov	\$56, %r8
   mov	\$120, %r10
-  cmp	\$56, $len
+  cmp	\$55, $len
   cmovg	%r10, %r8
   sub	%r8, %rsp
 ___
