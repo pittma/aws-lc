@@ -64,6 +64,9 @@
 #include "../digest/md32_common.h"
 #include "internal.h"
 
+int md5_avx512(const uint8_t *data, size_t len, uint32_t out[4]) {
+  return md5_x86_64_avx512(data, len, out);
+}
 
 uint8_t *MD5(const uint8_t *data, size_t len, uint8_t out[MD5_DIGEST_LENGTH]) {
 #if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)

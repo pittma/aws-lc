@@ -34,6 +34,7 @@
 #include "internal.h"
 
 #include <openssl/crypto.h>
+#include "../crypto/fipsmodule/md5/internal.h"
 
 #include "openssl/cmac.h"
 #if defined(OPENSSL_IS_AWSLC)
@@ -1143,6 +1144,38 @@ static bool SpeedHashChunk(const EVP_MD *md, std::string name,
   }
 
   results.PrintWithBytes(name, chunk_len);
+  return true;
+}
+
+static bool SpeedHashChunk512(std::string name, size_t chunk_len) {
+  std::unique_ptr<uint8_t[]> input(new uint8_t[chunk_len]);
+
+  TimeResults results;
+  if (!TimeFunction(&results, [chunk_len, &input]() -> bool {
+        uint32_t digest[4];
+        return md5_avx512(input.get(), chunk_len, digest);
+      })) {
+    fprintf(stderr, "EVP_DigestInit_ex failed.\n");
+    ERR_print_errors_fp(stderr);
+    return false;
+  }
+
+  results.PrintWithBytes(name, chunk_len);
+  return true;
+}
+
+static bool SpeedHash512(const std::string &name,
+                      const std::string &selected) {
+  if (!selected.empty() && name.find(selected) == std::string::npos) {
+    return true;
+  }
+
+  for (size_t chunk_len : g_chunk_lengths) {
+    if (!SpeedHashChunk512(name, chunk_len)) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -2890,6 +2923,7 @@ bool Speed(const std::vector<std::string> &args) {
        !SpeedHash(EVP_md4(), "MD4", selected) ||
 #endif
        !SpeedHash(EVP_md5(), "MD5", selected) ||
+       !SpeedHash512("MD5-512", selected) ||
        !SpeedHash(EVP_sha1(), "SHA-1", selected) ||
        !SpeedHash(EVP_sha224(), "SHA-224", selected) ||
        !SpeedHash(EVP_sha256(), "SHA-256", selected) ||
