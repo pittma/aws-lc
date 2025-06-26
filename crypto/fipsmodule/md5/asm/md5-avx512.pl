@@ -39,16 +39,22 @@ if ($avx512md5) {
   my $pd = "%xmm8";
 
   sub md5_step {
-    my ($src, $a, $b, $c, $d, $off, $rot, $t, $imm8) = @_;
+    my ($a, $b, $c, $d, $off, $rot, $t, $imm8) = @_;
 
-    # TODO(pittma): At the cost of another register, we can add t and k
-    # together, and then combine results which may get us better ILP.
+    my $mask = 1 << $off;
+
     $code .= <<___;
+    mov	\$$mask, %r10
+    kmovq	%r10, %k2
+    vmovdqa32	%zmm11, %zmm12 {%k2}	
+    mov	\$$off, %r11
+    vmovd	%r11, %xmm13
+    vpermd	%zmm12, %zmm13, %zmm12 {%k3}
     vmovdqa	$b, %xmm9                     # preserve b
     vpternlogd	$imm8, $d, $c, %xmm9      # f(b, c, d)
     vmovd	.L_T+4*$t(%rip), %xmm10
     vpaddd	$a, %xmm9, %xmm9              # f(b, c, d)  + a
-    vpaddd	$off*4($src), %xmm10, %xmm10  # T[i] + k[i]
+    vpaddd	%xmm12, %xmm10, %xmm10        # T[i] + k[i]
     vpaddd	%xmm9, %xmm10, %xmm9          # (T[i] + k[i]) + (f(b, c, d) + a)
     vprold	\$$rot, %xmm9, %xmm9          # tmp <<< s
     vpaddd	$b, %xmm9, $a                 # b + (tmp <<< s)
@@ -56,32 +62,30 @@ ___
   }
 
   sub round1_op {
-    my ($src, $a, $b, $c, $d, $off, $rot, $t) = @_;
+    my ($a, $b, $c, $d, $off, $rot, $t) = @_;
 
-    md5_step($src, $a, $b, $c, $d, $off, $rot, $t, "\$0xca");
+    md5_step($a, $b, $c, $d, $off, $rot, $t, "\$0xca");
   }
 
   sub round2_op {
-    my ($src, $a, $b, $c, $d, $off, $rot, $t) = @_;
+    my ($a, $b, $c, $d, $off, $rot, $t) = @_;
 
-    md5_step($src, $a, $b, $c, $d, $off, $rot, $t, "\$0xe4");
+    md5_step($a, $b, $c, $d, $off, $rot, $t, "\$0xe4");
   }
 
   sub round3_op {
-    my ($src, $a, $b, $c, $d, $off, $rot, $t) = @_;
+    my ($a, $b, $c, $d, $off, $rot, $t) = @_;
 
-    md5_step($src, $a, $b, $c, $d, $off, $rot, $t, "\$0x96");
+    md5_step($a, $b, $c, $d, $off, $rot, $t, "\$0x96");
   }
 
   sub round4_op {
-    my ($src, $a, $b, $c, $d, $off, $rot, $t) = @_;
+    my ($a, $b, $c, $d, $off, $rot, $t) = @_;
 
-    md5_step($src, $a, $b, $c, $d, $off, $rot, $t, "\$0x39");
+    md5_step($a, $b, $c, $d, $off, $rot, $t, "\$0x39");
   }
 
   sub one_round {
-   my ($src) = @_;
-
     $code .= <<___;
     vmovdqa	$a, $pa
     vmovdqa	$b, $pb
@@ -91,103 +95,103 @@ ___
 
     # Round 1
     # [ABCD  0  7  1]  [DABC  1 12  2]  [CDAB  2 17  3]  [BCDA  3 22  4]
-    round1_op($src, $a, $b, $c, $d, 0, 7,  0);
-    round1_op($src, $d, $a, $b, $c, 1, 12, 1);
-    round1_op($src, $c, $d, $a, $b, 2, 17, 2);
-    round1_op($src, $b, $c, $d, $a, 3, 22, 3);
+    round1_op($a, $b, $c, $d, 0, 7,  0);
+    round1_op($d, $a, $b, $c, 1, 12, 1);
+    round1_op($c, $d, $a, $b, 2, 17, 2);
+    round1_op($b, $c, $d, $a, 3, 22, 3);
 
     # [ABCD  4  7  5]  [DABC  5 12  6]  [CDAB  6 17  7]  [BCDA  7 22  8]
-    round1_op($src, $a, $b, $c, $d, 4, 7, 4);
-    round1_op($src, $d, $a, $b, $c, 5, 12, 5);
-    round1_op($src, $c, $d, $a, $b, 6, 17, 6);
-    round1_op($src, $b, $c, $d, $a, 7, 22, 7);
+    round1_op($a, $b, $c, $d, 4, 7, 4);
+    round1_op($d, $a, $b, $c, 5, 12, 5);
+    round1_op($c, $d, $a, $b, 6, 17, 6);
+    round1_op($b, $c, $d, $a, 7, 22, 7);
 
     # [ABCD  8  7  9]  [DABC  9 12 10]  [CDAB 10 17 11]  [BCDA 11 22 12]
-    round1_op($src, $a, $b, $c, $d, 8, 7, 8);
-    round1_op($src, $d, $a, $b, $c, 9, 12, 9);
-    round1_op($src, $c, $d, $a, $b, 10, 17, 10);
-    round1_op($src, $b, $c, $d, $a, 11, 22, 11);
+    round1_op($a, $b, $c, $d, 8, 7, 8);
+    round1_op($d, $a, $b, $c, 9, 12, 9);
+    round1_op($c, $d, $a, $b, 10, 17, 10);
+    round1_op($b, $c, $d, $a, 11, 22, 11);
 
     # [ABCD 12  7 13]  [DABC 13 12 14]  [CDAB 14 17 15]  [BCDA 15 22 16]
-    round1_op($src, $a, $b, $c, $d, 12, 7, 12);
-    round1_op($src, $d, $a, $b, $c, 13, 12, 13);
-    round1_op($src, $c, $d, $a, $b, 14, 17, 14);
-    round1_op($src, $b, $c, $d, $a, 15, 22, 15);
+    round1_op($a, $b, $c, $d, 12, 7, 12);
+    round1_op($d, $a, $b, $c, 13, 12, 13);
+    round1_op($c, $d, $a, $b, 14, 17, 14);
+    round1_op($b, $c, $d, $a, 15, 22, 15);
 
     # Round 2
     # [ABCD  1  5 17]  [DABC  6  9 18]  [CDAB 11 14 19]  [BCDA  0 20 20]
-    round2_op($src, $a, $b, $c, $d, 1, 5, 16);
-    round2_op($src, $d, $a, $b, $c, 6, 9, 17);
-    round2_op($src, $c, $d, $a, $b, 11, 14, 18);
-    round2_op($src, $b, $c, $d, $a, 0, 20, 19);
+    round2_op($a, $b, $c, $d, 1, 5, 16);
+    round2_op($d, $a, $b, $c, 6, 9, 17);
+    round2_op($c, $d, $a, $b, 11, 14, 18);
+    round2_op($b, $c, $d, $a, 0, 20, 19);
 
     # [ABCD  5  5 21]  [DABC 10  9 22]  [CDAB 15 14 23]  [BCDA  4 20 24]
-    round2_op($src, $a, $b, $c, $d, 5, 5, 20);
-    round2_op($src, $d, $a, $b, $c, 10, 9, 21);
-    round2_op($src, $c, $d, $a, $b, 15, 14, 22);
-    round2_op($src, $b, $c, $d, $a, 4, 20, 23);
+    round2_op($a, $b, $c, $d, 5, 5, 20);
+    round2_op($d, $a, $b, $c, 10, 9, 21);
+    round2_op($c, $d, $a, $b, 15, 14, 22);
+    round2_op($b, $c, $d, $a, 4, 20, 23);
 
     # [ABCD  9  5 25]  [DABC 14  9 26]  [CDAB  3 14 27]  [BCDA  8 20 28]
-    round2_op($src, $a, $b, $c, $d, 9, 5, 24);
-    round2_op($src, $d, $a, $b, $c, 14, 9, 25);
-    round2_op($src, $c, $d, $a, $b, 3, 14, 26);
-    round2_op($src, $b, $c, $d, $a, 8, 20, 27);
+    round2_op($a, $b, $c, $d, 9, 5, 24);
+    round2_op($d, $a, $b, $c, 14, 9, 25);
+    round2_op($c, $d, $a, $b, 3, 14, 26);
+    round2_op($b, $c, $d, $a, 8, 20, 27);
 
     # [ABCD 13  5 29]  [DABC  2  9 30]  [CDAB  7 14 31]  [BCDA 12 20 32]
-    round2_op($src, $a, $b, $c, $d, 13, 5, 28);
-    round2_op($src, $d, $a, $b, $c, 2, 9, 29);
-    round2_op($src, $c, $d, $a, $b, 7, 14, 30);
-    round2_op($src, $b, $c, $d, $a, 12, 20, 31);
+    round2_op($a, $b, $c, $d, 13, 5, 28);
+    round2_op($d, $a, $b, $c, 2, 9, 29);
+    round2_op($c, $d, $a, $b, 7, 14, 30);
+    round2_op($b, $c, $d, $a, 12, 20, 31);
 
     # Round 3
     # [ABCD  5  4 33]  [DABC  8 11 34]  [CDAB 11 16 35]  [BCDA 14 23 36]
-    round3_op($src, $a, $b, $c, $d, 5, 4, 32);
-    round3_op($src, $d, $a, $b, $c, 8, 11, 33);
-    round3_op($src, $c, $d, $a, $b, 11, 16, 34);
-    round3_op($src, $b, $c, $d, $a, 14, 23, 35);
+    round3_op($a, $b, $c, $d, 5, 4, 32);
+    round3_op($d, $a, $b, $c, 8, 11, 33);
+    round3_op($c, $d, $a, $b, 11, 16, 34);
+    round3_op($b, $c, $d, $a, 14, 23, 35);
 
     # [ABCD  1  4 37]  [DABC  4 11 38]  [CDAB  7 16 39]  [BCDA 10 23 40]
-    round3_op($src, $a, $b, $c, $d, 1, 4, 36);
-    round3_op($src, $d, $a, $b, $c, 4, 11, 37);
-    round3_op($src, $c, $d, $a, $b, 7, 16, 38);
-    round3_op($src, $b, $c, $d, $a, 10, 23, 39);
+    round3_op($a, $b, $c, $d, 1, 4, 36);
+    round3_op($d, $a, $b, $c, 4, 11, 37);
+    round3_op($c, $d, $a, $b, 7, 16, 38);
+    round3_op($b, $c, $d, $a, 10, 23, 39);
 
     # [ABCD 13  4 41]  [DABC  0 11 42]  [CDAB  3 16 43]  [BCDA  6 23 44]
-    round3_op($src, $a, $b, $c, $d, 13, 4, 40);
-    round3_op($src, $d, $a, $b, $c, 0, 11, 41);
-    round3_op($src, $c, $d, $a, $b, 3, 16, 42);
-    round3_op($src, $b, $c, $d, $a, 6, 23, 43);
+    round3_op($a, $b, $c, $d, 13, 4, 40);
+    round3_op($d, $a, $b, $c, 0, 11, 41);
+    round3_op($c, $d, $a, $b, 3, 16, 42);
+    round3_op($b, $c, $d, $a, 6, 23, 43);
 
     # [ABCD  9  4 45]  [DABC 12 11 46]  [CDAB 15 16 47]  [BCDA  2 23 48]
-    round3_op($src, $a, $b, $c, $d, 9, 4, 44);
-    round3_op($src, $d, $a, $b, $c, 12, 11, 45);
-    round3_op($src, $c, $d, $a, $b, 15, 16, 46);
-    round3_op($src, $b, $c, $d, $a, 2, 23, 47);
+    round3_op($a, $b, $c, $d, 9, 4, 44);
+    round3_op($d, $a, $b, $c, 12, 11, 45);
+    round3_op($c, $d, $a, $b, 15, 16, 46);
+    round3_op($b, $c, $d, $a, 2, 23, 47);
 
     # Round 4
     # [ABCD  0  6 49]  [DABC  7 10 50]  [CDAB 14 15 51]  [BCDA  5 21 52]
-    round4_op($src, $a, $b, $c, $d, 0, 6, 48);
-    round4_op($src, $d, $a, $b, $c, 7, 10, 49);
-    round4_op($src, $c, $d, $a, $b, 14, 15, 50);
-    round4_op($src, $b, $c, $d, $a, 5, 21, 51);
+    round4_op($a, $b, $c, $d, 0, 6, 48);
+    round4_op($d, $a, $b, $c, 7, 10, 49);
+    round4_op($c, $d, $a, $b, 14, 15, 50);
+    round4_op($b, $c, $d, $a, 5, 21, 51);
 
     # [ABCD 12  6 53]  [DABC  3 10 54]  [CDAB 10 15 55]  [BCDA  1 21 56]
-    round4_op($src, $a, $b, $c, $d, 12, 6, 52);
-    round4_op($src, $d, $a, $b, $c, 3, 10, 53);
-    round4_op($src, $c, $d, $a, $b, 10, 15, 54);
-    round4_op($src, $b, $c, $d, $a, 1, 21, 55);
+    round4_op($a, $b, $c, $d, 12, 6, 52);
+    round4_op($d, $a, $b, $c, 3, 10, 53);
+    round4_op($c, $d, $a, $b, 10, 15, 54);
+    round4_op($b, $c, $d, $a, 1, 21, 55);
 
     # [ABCD  8  6 57]  [DABC 15 10 58]  [CDAB  6 15 59]  [BCDA 13 21 60]
-    round4_op($src, $a, $b, $c, $d, 8, 6, 56);
-    round4_op($src, $d, $a, $b, $c, 15, 10, 57);
-    round4_op($src, $c, $d, $a, $b, 6, 15, 58);
-    round4_op($src, $b, $c, $d, $a, 13, 21, 59);
+    round4_op($a, $b, $c, $d, 8, 6, 56);
+    round4_op($d, $a, $b, $c, 15, 10, 57);
+    round4_op($c, $d, $a, $b, 6, 15, 58);
+    round4_op($b, $c, $d, $a, 13, 21, 59);
 
     # [ABCD  4  6 61]  [DABC 11 10 62]  [CDAB  2 15 63]  [BCDA  9 21 64]
-    round4_op($src, $a, $b, $c, $d, 4, 6, 60);
-    round4_op($src, $d, $a, $b, $c, 11, 10, 61);
-    round4_op($src, $c, $d, $a, $b, 2, 15, 62);
-    round4_op($src, $b, $c, $d, $a, 9, 21, 63);
+    round4_op($a, $b, $c, $d, 4, 6, 60);
+    round4_op($d, $a, $b, $c, 11, 10, 61);
+    round4_op($c, $d, $a, $b, 2, 15, 62);
+    round4_op($b, $c, $d, $a, 9, 21, 63);
 
     $code .= <<___;
     vpaddd	$pa, $a, $a
@@ -216,7 +220,8 @@ ___
 
   # preserve initial length
   mov	$len, %r8
-
+  mov \$1, %r9
+  kmovq %r9, %k3 # k3 is our permanent idx 0 mask.
   vmovd	.L_A(%rip), $a
   vmovd	.L_B(%rip), $b
   vmovd	.L_C(%rip), $c
@@ -225,13 +230,14 @@ ___
 
   # special case of message being < 64 bytes in length
   cmp	\$64, $len
-  jl	.L_final_blocks
+  jle	.L_final_blocks
 
   .align 32
   .L_main_loop:
+  vmovdqu8	($data), %zmm11
 ___
 
-  one_round($data);
+  one_round();
 
   $code .= <<___;
   sub \$64, $len
@@ -279,17 +285,19 @@ ___
   cmp	\$55, $len
   cmovg	%r10, %r8
   sub	%r8, %rsp
+  vmovdqu8	(%rsp), %zmm11
 ___
 
-  one_round('%rsp');
+  one_round();
 
   $code .= <<___;
   cmp	\$56, %r8
   je	.L_done
   add	\$64, %rsp
+  vmovdqu8	(%rsp), %zmm11
 ___
 
-  one_round('%rsp');
+  one_round();
 
   $code .= <<___;
   .L_done:
