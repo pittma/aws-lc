@@ -26,12 +26,9 @@ if ($avx512md5) {
 
   # Offsets into the stack for previous A, B, C and D values.
   my $pa = 8 * 4;
-  my $pb = $pa + 4
+  my $pb = $pa + 4;
   my $pc = $pb + 4;
   my $pd = $pc + 4;
-
-  # Offset into the stack for building the final block.
-  my $final_block = $pd + 4;
 
   my $stack_storage = (8 * 4) + (4 * 4) + 128;
 
@@ -39,25 +36,27 @@ if ($avx512md5) {
   my $len = "%rsi";
   my $out = "%rdx";
 
-  my $a = "%r12";
-  my $b = "%r13";
-  my $c = "%r14";
-  my $d = "%r15";
+  my $a = "%r12d";
+  my $b = "%r13d";
+  my $c = "%r14d";
+  my $d = "%r15d";
 
   sub md5_step {
     my ($src, $a, $b, $c, $d, $off, $rot, $t, $imm8) = @_;
 
-    # TODO(pittma): At the cost of another register, we can add t and k
-    # together, and then combine results which may get us better ILP.
     $code .= <<___;
-    vmovdqa	$b, %xmm9                     # preserve b
-    vpternlogd	$imm8, $d, $c, %xmm9      # f(b, c, d)
-    vmovd	.L_T+4*$t(%rip), %xmm10
-    vpaddd	$a, %xmm9, %xmm9              # f(b, c, d)  + a
-    vpaddd	$off*4($src), %xmm10, %xmm10  # T[i] + k[i]
-    vpaddd	%xmm9, %xmm10, %xmm9          # (T[i] + k[i]) + (f(b, c, d) + a)
-    vprold	\$$rot, %xmm9, %xmm9          # tmp <<< s
-    vpaddd	$b, %xmm9, $a                 # b + (tmp <<< s)
+    vmovd	$b, %xmm9                     # preserve b
+    vmovd	$c, %xmm10
+    vmovd	$d, %xmm11
+    vpternlogd	$imm8, %xmm11, %xmm10, %xmm9      # f(b, c, d)
+    vmovd	%xmm9, %r11d
+    mov	.L_T+4*$t(%rip), %r10d
+    addl	$a, %r11d              # f(b, c, d)  + a
+    addl	$off*4($src), %r10d
+    addl	%r10d, %r11d          # (T[i] + k[i]) + (f(b, c, d) + a)
+    roll	\$$rot, %r11d          # tmp <<< s
+    addl	$b, %r11d                # b + (tmp <<< s)
+    mov %r11d, $a
 ___
   }
 
@@ -196,10 +195,10 @@ ___
     round4_op($src, $b, $c, $d, $a, 9, 21, 63);
 
     $code .= <<___;
-    add	$a, $pa(%rsp), $a
-    add	$b, $pb(%rsp), $b
-    add	$c, $pc(%rsp), $c
-    add	$d, $pd(%rsp), $d
+    add	$pa(%rsp), $a
+    add	$pb(%rsp), $b
+    add	$pc(%rsp), $c
+    add	$pd(%rsp), $d
 ___
   }
 
@@ -218,7 +217,7 @@ ___
   endbranch
   push	%rbp
   mov	%rsp, %rbp
-  sub	\$$stack_offset, %rsp
+  sub	\$$stack_storage, %rsp
   and	\$0xffffffffffffffc0,%rsp
   mov	%r12, 8*0(%rsp)
   mov	%r13, 8*1(%rsp)
@@ -228,11 +227,10 @@ ___
   # preserve initial length
   mov	$len, %r8
 
-  vmovd	.L_A(%rip), $a
-  vmovd	.L_B(%rip), $b
-  vmovd	.L_C(%rip), $c
-  vmovd	.L_D(%rip), $d
-  vpxord	%xmm9, %xmm9, %xmm9
+  mov	.L_A(%rip), $a
+  mov	.L_B(%rip), $b
+  mov	.L_C(%rip), $c
+  mov	.L_D(%rip), $d
 
   # special case of message being < 64 bytes in length
   cmp	\$64, $len
@@ -254,6 +252,7 @@ ___
   shl	\$3, %r8 # bit length
 
   # copy final block to the stack.
+  add	\$48, %rsp
   vpxorq	%zmm9, %zmm9, %zmm9
   mov	$len, %rcx
   mov	\$1, %r9
@@ -282,7 +281,6 @@ ___
   vmovdqu8	%zmm9, (%rsp){%k1}
   add	%rcx,%rsp
 
-  # TODO(pittma): possible improvement here too w/r/t chained registers.
   .L_append_le_length:
   mov	%r8, (%rsp)
   mov	\$56, %r8
@@ -290,30 +288,36 @@ ___
   cmp	\$55, $len
   cmovg	%r10, %r8
   sub	%r8, %rsp
+
+  # store the location of the final block in rcx
+  mov	%rsp, %rcx
+
+  # reset the stack pointer so A-D's offsets are still valid.
+  sub	\$48, %rsp
 ___
 
-  one_round('%rsp');
+  one_round('%rcx');
 
   $code .= <<___;
   cmp	\$56, %r8
   je	.L_done
-  add	\$64, %rsp
+  add	\$64, %rcx
 ___
 
-  one_round('%rsp');
+  one_round('%rcx');
 
   $code .= <<___;
   .L_done:
-  vmovd	$a, 4*0($out)
-  vmovd	$b, 4*1($out)
-  vmovd	$c, 4*2($out)
-  vmovd	$d, 4*3($out)
+  mov	$a, 4*0($out)
+  mov	$b, 4*1($out)
+  mov	$c, 4*2($out)
+  mov	$d, 4*3($out)
 
   .L_ret:
-  mov	8*0(%rbp), %r12
-  mov	8*1(%rbp), %r13
-  mov	8*2(%rbp), %r14
-  mov	8*3(%rbp), %r15
+  mov	8*0(%rsp), %r12
+  mov	8*1(%rsp), %r13
+  mov	8*2(%rsp), %r14
+  mov	8*3(%rsp), %r15
   mov	%rbp, %rsp
   pop	%rbp
   movq \$1, %rax
