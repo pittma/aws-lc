@@ -24,19 +24,25 @@ open OUT,"| \"$^X\" \"$xlate\" $flavour \"$output\"";
 
 if ($avx512md5) {
 
+  # Offsets into the stack for previous A, B, C and D values.
+  my $pa = 8 * 4;
+  my $pb = $pa + 4
+  my $pc = $pb + 4;
+  my $pd = $pc + 4;
+
+  # Offset into the stack for building the final block.
+  my $final_block = $pd + 4;
+
+  my $stack_storage = (8 * 4) + (4 * 4) + 128;
+
   my $data = "%rdi";
   my $len = "%rsi";
   my $out = "%rdx";
 
-  my $a = "%xmm1";
-  my $b = "%xmm2";
-  my $c = "%xmm3";
-  my $d = "%xmm4";
-
-  my $pa = "%xmm5";
-  my $pb = "%xmm6";
-  my $pc = "%xmm7";
-  my $pd = "%xmm8";
+  my $a = "%r12";
+  my $b = "%r13";
+  my $c = "%r14";
+  my $d = "%r15";
 
   sub md5_step {
     my ($src, $a, $b, $c, $d, $off, $rot, $t, $imm8) = @_;
@@ -83,10 +89,10 @@ ___
    my ($src) = @_;
 
     $code .= <<___;
-    vmovdqa	$a, $pa
-    vmovdqa	$b, $pb
-    vmovdqa	$c, $pc
-    vmovdqa	$d, $pd
+    mov	$a, $pa(%rsp)
+    mov	$b, $pb(%rsp)
+    mov	$c, $pc(%rsp)
+    mov	$d, $pd(%rsp)
 ___
 
     # Round 1
@@ -190,10 +196,10 @@ ___
     round4_op($src, $b, $c, $d, $a, 9, 21, 63);
 
     $code .= <<___;
-    vpaddd	$pa, $a, $a
-    vpaddd	$pb, $b, $b
-    vpaddd	$pc, $c, $c
-    vpaddd	$pd, $d, $d
+    add	$a, $pa(%rsp), $a
+    add	$b, $pb(%rsp), $b
+    add	$c, $pc(%rsp), $c
+    add	$d, $pd(%rsp), $d
 ___
   }
 
@@ -212,7 +218,12 @@ ___
   endbranch
   push	%rbp
   mov	%rsp, %rbp
-  sub	\$128, %rsp
+  sub	\$$stack_offset, %rsp
+  and	\$0xffffffffffffffc0,%rsp
+  mov	%r12, 8*0(%rsp)
+  mov	%r13, 8*1(%rsp)
+  mov	%r14, 8*2(%rsp)
+  mov	%r15, 8*3(%rsp)
 
   # preserve initial length
   mov	$len, %r8
@@ -299,6 +310,10 @@ ___
   vmovd	$d, 4*3($out)
 
   .L_ret:
+  mov	8*0(%rbp), %r12
+  mov	8*1(%rbp), %r13
+  mov	8*2(%rbp), %r14
+  mov	8*3(%rbp), %r15
   mov	%rbp, %rsp
   pop	%rbp
   movq \$1, %rax
