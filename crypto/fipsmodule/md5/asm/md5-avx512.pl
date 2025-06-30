@@ -24,9 +24,9 @@ open OUT,"| \"$^X\" \"$xlate\" $flavour \"$output\"";
 
 if ($avx512md5) {
 
-  my $data = "%rdi";
-  my $len = "%rsi";
-  my $out = "%rdx";
+  my $state = "%rdi";
+  my $data = "%rsi";
+  my $num = "%rdx";
 
   my $a = "%xmm1";
   my $b = "%xmm2";
@@ -210,23 +210,11 @@ ___
   md5_x86_64_avx512:
   .cfi_startproc
   endbranch
-  push	%rbp
-  mov	%rsp, %rbp
-  sub	\$128, %rsp
-  and	\$0xffffffffffffffc0,%rsp
 
-  # preserve initial length
-  mov	$len, %r8
-
-  vmovd	.L_A(%rip), $a
-  vmovd	.L_B(%rip), $b
-  vmovd	.L_C(%rip), $c
-  vmovd	.L_D(%rip), $d
-  vpxord	%xmm9, %xmm9, %xmm9
-
-  # special case of message being < 64 bytes in length
-  cmp	\$64, $len
-  jl	.L_final_blocks
+  vmovd	4*0($state), $a
+  vmovd	4*1($state), $b
+  vmovd	4*2($state), $c
+  vmovd	4*3($state), $d
 
   .align 32
   .L_main_loop:
@@ -235,89 +223,19 @@ ___
   one_round($data);
 
   $code .= <<___;
-  sub \$64, $len
   add \$64, $data
-  cmp \$64, $len
+  sub \$1, $num
+  cmp \$0, $num
   jg .L_main_loop
 
-  .L_final_blocks:
-  shl	\$3, %r8 # bit length
-
-  # copy final block to the stack.
-  vpxorq	%zmm9, %zmm9, %zmm9
-  mov	$len, %rcx
-  mov	\$1, %r9
-  shlq	%cl, %r9
-  sub	\$1, %r9
-  kmovq	%r9, %k1
-  vmovdqu8	($data), %zmm9{%k1}
-  vmovdqu8	%zmm9, (%rsp){%k1}
-  add	$len, %rsp
-  movq	\$0x80,(%rsp)
-  add	\$1, %rsp
-
-  # handle padding
-  mov \$55, %rcx
-  mov \$119, %r10
-  cmp	\$56, $len
-  cmovg	%r10, %rcx
-  vpxorq	%zmm9, %zmm9, %zmm9
-  sub	$len, %rcx
-  cmp	\$0, %rcx
-  je	.L_append_le_length # no padding needed
-  mov	\$1, %r9
-  shlq	%cl, %r9
-  sub	\$1, %r9
-  kmovq	%r9, %k1
-  vmovdqu8	%zmm9, (%rsp){%k1}
-  add	%rcx,%rsp
-
-  # TODO(pittma): possible improvement here too w/r/t chained registers.
-  .L_append_le_length:
-  mov	%r8, (%rsp)
-  mov	\$56, %r8
-  mov	\$120, %r10
-  cmp	\$55, $len
-  cmovg	%r10, %r8
-  sub	%r8, %rsp
-___
-
-  one_round('%rsp');
-
-  $code .= <<___;
-  cmp	\$56, %r8
-  je	.L_done
-  add	\$64, %rsp
-___
-
-  one_round('%rsp');
-
-  $code .= <<___;
   .L_done:
-  vmovd	$a, 4*0($out)
-  vmovd	$b, 4*1($out)
-  vmovd	$c, 4*2($out)
-  vmovd	$d, 4*3($out)
-
-  .L_ret:
-  mov	%rbp, %rsp
-  pop	%rbp
-  movq \$1, %rax
+  vmovd	$a, 4*0($state)
+  vmovd	$b, 4*1($state)
+  vmovd	$c, 4*2($state)
+  vmovd	$d, 4*3($state)
   ret
   .cfi_endproc
   .size md5_x86_64_avx512,.-md5_x86_64_avx512
-
-  .section .rodata
-  .align 32
-
-  .L_A:
-    .long 0x67452301
-  .L_B:
-    .long 0xefcdab89
-  .L_C:
-    .long 0x98badcfe
-  .L_D:
-    .long 0x10325476
 
   .L_T:
       .long 0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee

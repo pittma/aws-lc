@@ -52,13 +52,8 @@ extern void md5_block_asm_data_order(uint32_t *state, const uint8_t *data,
                                      size_t num);
 #endif
 
-OPENSSL_EXPORT int md5_avx512(const uint8_t *data,
-                             size_t len,
-                             uint32_t out[4]);
-
-extern int md5_x86_64_avx512(const uint8_t *data,
-                             size_t len,
-                             uint32_t out[4]);
+extern void md5_x86_64_avx512(uint32_t *state, const uint8_t *data, 
+                              size_t num);
 
 
 #if defined(__cplusplus)

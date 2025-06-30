@@ -64,17 +64,7 @@
 #include "../digest/md32_common.h"
 #include "internal.h"
 
-int md5_avx512(const uint8_t *data, size_t len, uint32_t out[4]) {
-  return md5_x86_64_avx512(data, len, out);
-}
-
 uint8_t *MD5(const uint8_t *data, size_t len, uint8_t out[MD5_DIGEST_LENGTH]) {
-#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
-  if (CRYPTO_is_AVX512_capable()) {
-    md5_x86_64_avx512(data, len, (uint32_t*)out);
-    return out;
-  }
-#endif
   MD5_CTX ctx;
   MD5_Init(&ctx);
   MD5_Update(&ctx, data, len);
@@ -84,11 +74,6 @@ uint8_t *MD5(const uint8_t *data, size_t len, uint8_t out[MD5_DIGEST_LENGTH]) {
 
 int MD5_Init(MD5_CTX *md5) {
   OPENSSL_memset(md5, 0, sizeof(MD5_CTX));
-#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
-  if (CRYPTO_is_AVX512_capable()) {
-      return 1;
-  }
-#endif
   md5->h[0] = 0x67452301UL;
   md5->h[1] = 0xefcdab89UL;
   md5->h[2] = 0x98badcfeUL;
@@ -117,7 +102,9 @@ int MD5_Init_from_state(MD5_CTX *md5, const uint8_t h[MD5_CHAINING_LENGTH],
   return 1;
 }
 
-#if defined(MD5_ASM)
+#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
+#define md5_block_data_order md5_x86_64_avx512
+#elif defined(MD5_ASM)
 #define md5_block_data_order md5_block_asm_data_order
 #else
 static void md5_block_data_order(uint32_t *state, const uint8_t *data,
@@ -129,35 +116,12 @@ void MD5_Transform(MD5_CTX *c, const uint8_t data[MD5_CBLOCK]) {
 }
 
 int MD5_Update(MD5_CTX *c, const void *data, size_t len) {
-#if defined(MD5_ASM) && !defined(DMY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
-  // If AVX-512 is available and we compiled with support for it, we run the
-  // whole hash routine here. Padding and all are implemented in assembly.
-  // Because c->data is limited to 64 bytes, we're kind of stuck doing this in
-  // `Update`.
-
-  // TODO(pittma): we could abuse c->Nl or c->Nh here and write len to either,
-  // then run the whole routine in `Final` directly into `out`, avoiding that
-  // second copy.
-  if (CRYPTO_is_AVX512_capable()) {
-    md5_x86_64_avx512(data, len, c->h);
-    return 1;
-  }
-#endif
   crypto_md32_update(&md5_block_data_order, c->h, c->data, MD5_CBLOCK, &c->num,
                      &c->Nh, &c->Nl, data, len);
   return 1;
 }
 
 int MD5_Final(uint8_t out[MD5_DIGEST_LENGTH], MD5_CTX *c) {
-#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
-  if (CRYPTO_is_AVX512_capable()) {
-    CRYPTO_store_u32_le(out, c->h[0]);
-    CRYPTO_store_u32_le(out + 4, c->h[1]);
-    CRYPTO_store_u32_le(out + 8, c->h[2]);
-    CRYPTO_store_u32_le(out + 12, c->h[3]);
-    return 1;
-  }
-#endif
   crypto_md32_final(&md5_block_data_order, c->h, c->data, MD5_CBLOCK, &c->num,
                     c->Nh, c->Nl, /*is_big_endian=*/0);
 
