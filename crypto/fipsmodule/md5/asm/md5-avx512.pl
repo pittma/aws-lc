@@ -44,11 +44,11 @@ if ($avx512md5) {
     # TODO(pittma): At the cost of another register, we can add t and k
     # together, and then combine results which may get us better ILP.
     $code .= <<___;
+    vmovd	.L_T+4*$t(%rip), %xmm10
+    vpaddd	$off*4($src), %xmm10, %xmm10  # T[i] + k[i]
+    vpaddd	$a, %xmm10, %xmm10            # T[i] + k[i] + a
     vmovdqa	$b, %xmm9                     # preserve b
     vpternlogd	$imm8, $d, $c, %xmm9      # f(b, c, d)
-    vmovd	.L_T+4*$t(%rip), %xmm10
-    vpaddd	$a, %xmm9, %xmm9              # f(b, c, d)  + a
-    vpaddd	$off*4($src), %xmm10, %xmm10  # T[i] + k[i]
     vpaddd	%xmm9, %xmm10, %xmm9          # (T[i] + k[i]) + (f(b, c, d) + a)
     vprold	\$$rot, %xmm9, %xmm9          # tmp <<< s
     vpaddd	$b, %xmm9, $a                 # b + (tmp <<< s)
