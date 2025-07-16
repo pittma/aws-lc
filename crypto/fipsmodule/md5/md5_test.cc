@@ -30,5 +30,10 @@ TEST(MD5Test, ABI) {
   CHECK_ABI(md5_block_asm_data_order, ctx.h, kBuf, 2);
   CHECK_ABI(md5_block_asm_data_order, ctx.h, kBuf, 4);
   CHECK_ABI(md5_block_asm_data_order, ctx.h, kBuf, 8);
+
+  CHECK_ABI(md5_x86_64_avx512, ctx.h, kBuf, 1);
+  CHECK_ABI(md5_x86_64_avx512, ctx.h, kBuf, 2);
+  CHECK_ABI(md5_x86_64_avx512, ctx.h, kBuf, 4);
+  CHECK_ABI(md5_x86_64_avx512, ctx.h, kBuf, 8);
 }
 #endif  // MD5_ASM && SUPPORTS_ABI_TEST

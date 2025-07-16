@@ -24,6 +24,8 @@ open OUT,"| \"$^X\" \"$xlate\" $flavour \"$output\"";
 
 if ($avx512md5) {
 
+  my $XMM_STORAGE = 16 * 5;
+
   my $state = "%rdi";
   my $data = "%rsi";
   my $num = "%rdx";
@@ -210,7 +212,21 @@ ___
   md5_x86_64_avx512:
   .cfi_startproc
   endbranch
-
+___
+  if ($win64) {
+    $code .= <<___;
+    push  %rbp
+    mov %rsp,%rbp
+    sub $XMM_STORAGE, %rsp
+    and	\$0xffffffffffffffc0,%rsp
+    vmovdqa  %xmm6, 16*0(%rsp)
+    vmovdqa  %xmm7, 16*1(%rsp)
+    vmovdqa  %xmm8, 16*2(%rsp)
+    vmovdqa  %xmm9, 16*3(%rsp)
+    vmovdqa  %xmm10, 16*4(%rsp)
+___
+  }
+  $code .= <<___;
   vmovd	4*0($state), $a
   vmovd	4*1($state), $b
   vmovd	4*2($state), $c
@@ -229,6 +245,20 @@ ___
   jg .L_main_loop
 
   .L_done:
+___
+  if ($win64) {
+    $code .= <<___;
+    vmovdqa  16*0(%rsp), %xmm6
+    vmovdqa  16*1(%rsp), %xmm7
+    vmovdqa  16*2(%rsp), %xmm8
+    vmovdqa  16*3(%rsp), %xmm9
+    vmovdqa  16*4(%rsp), %xmm10
+    mov %rbp,%rsp
+    pop  %rbp
+___
+  }
+
+  $code .= <<___;
   vmovd	$a, 4*0($state)
   vmovd	$b, 4*1($state)
   vmovd	$c, 4*2($state)
