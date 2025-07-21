@@ -112,17 +112,52 @@ static void md5_block_data_order(uint32_t *state, const uint8_t *data,
 #endif
 
 void MD5_Transform(MD5_CTX *c, const uint8_t data[MD5_CBLOCK]) {
-  md5_block_data_order(c->h, data, 1);
+  void (*block_func)(uint32_t *state, const uint8_t *data,
+                     size_t num);
+  block_func = md5_block_data_order;
+
+// If we built for AVX-512 && MD5_ASM but AVX-512 is not available at runtime,
+// we fall back to the non-vectorized asm implementation.
+#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
+  if (!CRYPTO_is_AVX512_capable()) {
+    block_func = md5_block_asm_data_order;
+  }
+#endif
+  block_func(c->h, data, 1);
 }
 
 int MD5_Update(MD5_CTX *c, const void *data, size_t len) {
-  crypto_md32_update(&md5_block_data_order, c->h, c->data, MD5_CBLOCK, &c->num,
+  void (*block_func)(uint32_t *state, const uint8_t *data,
+                     size_t num);
+  block_func = md5_block_data_order;
+
+// Same as above: if we built for AVX-512 && MD5_ASM but AVX-512 is not
+// available at runtime, we fall back to the non-vectorized asm implementation.
+#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
+  if (!CRYPTO_is_AVX512_capable()) {
+    block_func = md5_block_asm_data_order;
+  }
+#endif
+
+  crypto_md32_update(block_func, c->h, c->data, MD5_CBLOCK, &c->num,
                      &c->Nh, &c->Nl, data, len);
   return 1;
 }
 
 int MD5_Final(uint8_t out[MD5_DIGEST_LENGTH], MD5_CTX *c) {
-  crypto_md32_final(&md5_block_data_order, c->h, c->data, MD5_CBLOCK, &c->num,
+  void (*block_func)(uint32_t *state, const uint8_t *data,
+                     size_t num);
+  block_func = md5_block_data_order;
+
+// Once more: if we built for AVX-512 && MD5_ASM but AVX-512 is not available
+// at runtime, we fall back to the non-vectorized asm implementation.
+#if defined(MD5_ASM) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
+  if (!CRYPTO_is_AVX512_capable()) {
+    block_func = md5_block_asm_data_order;
+  }
+#endif
+
+  crypto_md32_final(block_func, c->h, c->data, MD5_CBLOCK, &c->num,
                     c->Nh, c->Nl, /*is_big_endian=*/0);
 
   CRYPTO_store_u32_le(out, c->h[0]);
