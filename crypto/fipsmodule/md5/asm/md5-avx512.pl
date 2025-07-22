@@ -203,6 +203,7 @@ ___
   #                       size_t len,
   #                       uint8_t out[MD5_DIGEST_LENGTH]);
   $code .= <<___;
+#ifndef MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX
   .text
   .align 32
 
@@ -286,6 +287,7 @@ ___
       .long 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1
       .long 0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1
       .long 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+#endif
 ___
 
 } else {
@@ -294,7 +296,7 @@ ___
   .globl	md5_x86_64_avx512
     .byte   0x0f,0x0b    # ud2
     ret
-  .size md5_x86_64_avx512, .-md5_x86_64_avx512
+  .size md5_x86_64_avx512,.-md5_x86_64_avx512
 ___
 }
 
