@@ -267,6 +267,8 @@ ___
   .cfi_endproc
   .size md5_x86_64_avx512,.-md5_x86_64_avx512
 
+  .section .rodata
+  .align 32
   .L_T:
       .long 0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee
       .long 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501
@@ -286,7 +288,16 @@ ___
       .long 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
 ___
 
-  print $code;
-
-  close STDOUT or die "error closing STDOUT: $!";
+} else {
+  $code = <<___;
+  .text
+  .globl	md5_x86_64_avx512
+    .byte   0x0f,0x0b    # ud2
+    ret
+  .size md5_x86_64_avx512, .-md5_x86_64_avx512
+___
 }
+
+print $code;
+
+close STDOUT or die "error closing STDOUT: $!";
