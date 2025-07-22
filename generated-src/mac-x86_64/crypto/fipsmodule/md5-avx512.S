@@ -4,6 +4,7 @@
 #include <openssl/asm_base.h>
 
 #if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_X86_64) && defined(__APPLE__)
+#ifndef MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX
 .text	
 .p2align	5
 
@@ -555,6 +556,8 @@ L$_done:
 
 
 
+.section	__DATA,__const
+.p2align	5
 L$_T:
 .long	0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee
 .long	0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501
@@ -572,4 +575,5 @@ L$_T:
 .long	0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1
 .long	0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1
 .long	0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+#endif
 #endif

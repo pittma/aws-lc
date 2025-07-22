@@ -9,6 +9,7 @@ default	rel
 %define _CET_ENDBR
 
 %include "openssl/boringssl_prefix_symbols_nasm.inc"
+%ifndef MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX
 section	.text code align=64
 
 ALIGN	32
@@ -587,6 +588,8 @@ $L$_done:
 
 $L$SEH_end_md5_x86_64_avx512:
 
+section	.rdata rdata align=8
+ALIGN	32
 $L$_T:
 	DD	0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee
 	DD	0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501
@@ -604,6 +607,7 @@ $L$_T:
 	DD	0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1
 	DD	0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1
 	DD	0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391
+%endif
 %else
 ; Work around https://bugzilla.nasm.us/show_bug.cgi?id=3392738
 ret
