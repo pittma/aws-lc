@@ -49,7 +49,7 @@ OPENSSL_EXPORT int MD5_get_state(MD5_CTX *ctx,
 // If building for x86_64 and we have a new enough assembler, we need both
 // definitions for the case where we've built for AVX-512, but it is not
 // available at runtime.
-#if defined(OPENSSL_X86_64) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_AVX)
+#if defined(OPENSSL_X86_64) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
 #define MD5_ASM_AVX512
 extern void md5_x86_64_avx512(uint32_t *state, const uint8_t *data, 
                               size_t num);

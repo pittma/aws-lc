@@ -32,7 +32,7 @@ TEST(MD5Test, ABI) {
   CHECK_ABI(md5_block_asm_data_order, ctx.h, kBuf, 4);
   CHECK_ABI(md5_block_asm_data_order, ctx.h, kBuf, 8);
 
-#if !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
+#if defined(OPENSSL_X86_64) && !defined(MY_ASSEMBLER_IS_TOO_OLD_FOR_512AVX)
   if (CRYPTO_is_AVX512_capable()) {
     CHECK_ABI(md5_x86_64_avx512, ctx.h, kBuf, 1);
     CHECK_ABI(md5_x86_64_avx512, ctx.h, kBuf, 2);

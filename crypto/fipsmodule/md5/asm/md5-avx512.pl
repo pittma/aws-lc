@@ -266,7 +266,7 @@ ___
   vmovd	$d, 4*3($state)
   ret
   .cfi_endproc
-  .size md5_x86_64_avx512,.-md5_x86_64_avx512
+  .size md5_x86_64_avx512, .-md5_x86_64_avx512
 
   .section .rodata
   .align 32
@@ -294,9 +294,10 @@ ___
   $code = <<___;
   .text
   .globl	md5_x86_64_avx512
+  md5_x86_64_avx512:
     .byte   0x0f,0x0b    # ud2
     ret
-  .size md5_x86_64_avx512,.-md5_x86_64_avx512
+  .size md5_x86_64_avx512, .-md5_x86_64_avx512
 ___
 }
 
