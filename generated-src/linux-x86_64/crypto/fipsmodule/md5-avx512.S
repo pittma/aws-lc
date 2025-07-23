@@ -554,7 +554,7 @@ md5_x86_64_avx512:
 	vmovd	%xmm4,12(%rdi)
 	.byte	0xf3,0xc3
 .cfi_endproc	
-.size	md5_x86_64_avx512,.-md5_x86_64_avx512
+.size	md5_x86_64_avx512, .-md5_x86_64_avx512
 
 .section	.rodata
 .align	32
