@@ -427,20 +427,12 @@ rsaz_amm52x20_x2_ifma256:
 
     movq    $b, $b_ptr                       # backup address of b
     movq    \$0xfffffffffffff, $mask52       # 52-bit mask
-
-    mov    \$20, $iter
-
-.align 32
-.Lloop20:
 ___
-    &amm52x20_x1(   0,   0,$acc0_0,$R0_0,$R0_0h,$R1_0,$R1_0h,$R2_0,"($k0)");
-    # 20*8 = offset of the next dimension in two-dimension array
-    &amm52x20_x1(20*8,20*8,$acc0_1,$R0_1,$R0_1h,$R1_1,$R1_1h,$R2_1,"8($k0)");
-$code.=<<___;
-    lea    8($b_ptr), $b_ptr
-    dec    $iter
-    jne    .Lloop20
-___
+  foreach my $idx (0..19) {
+    my $_offset = 8*$idx;
+    &amm52x20_x1(0,$_offset,$acc0_0,$R0_0,$R0_0h,$R1_0,$R1_0h,$R2_0,"($k0)");
+    &amm52x20_x1(160,$_offset+160,$acc0_1,$R0_1,$R0_1h,$R1_1,$R1_1h,$R2_1,"8($k0)");
+  }
     &amm52x20_x1_norm($acc0_0,$R0_0,$R0_0h,$R1_0,$R1_0h,$R2_0);
     &amm52x20_x1_norm($acc0_1,$R0_1,$R0_1h,$R1_1,$R1_1h,$R2_1);
 $code.=<<___;

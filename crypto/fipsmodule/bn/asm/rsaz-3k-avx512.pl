@@ -553,20 +553,13 @@ $code.=<<___;
 
     movq    $b, $b_ptr                       # backup address of b
     movq    \$0xfffffffffffff, $mask52       # 52-bit mask
-
-    mov    \$30, $iter
-
-.align 32
-.Lloop30:
 ___
-    &amm52x30_x1(   0,   0,$acc0_0,$R0_0,$R0_0h,$R1_0,$R1_0h,$R2_0,$R2_0h,$R3_0,$R3_0h,"($k0)");
+  foreach my $idx (0..29) {
+    &amm52x30_x1(0,0,$acc0_0,$R0_0,$R0_0h,$R1_0,$R1_0h,$R2_0,$R2_0h,$R3_0,$R3_0h,"($k0)");
     # 32*8 = offset of the next dimension in two-dimension array
     &amm52x30_x1(32*8,32*8,$acc0_1,$R0_1,$R0_1h,$R1_1,$R1_1h,$R2_1,$R2_1h,$R3_1,$R3_1h,"8($k0)");
-$code.=<<___;
-    lea    8($b_ptr), $b_ptr
-    dec    $iter
-    jne    .Lloop30
-___
+    $code .= "lea	8($b_ptr),$b_ptr\n";
+  }
     &amm52x30_x1_norm($acc0_0,$R0_0,$R0_0h,$R1_0,$R1_0h,$R2_0,$R2_0h,$R3_0,$R3_0h);
     &amm52x30_x1_norm($acc0_1,$R0_1,$R0_1h,$R1_1,$R1_1h,$R2_1,$R2_1h,$R3_1,$R3_1h);
 $code.=<<___;
