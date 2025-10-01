@@ -435,6 +435,51 @@ void ml_dsa_poly_uniform_eta(ml_dsa_params *params,
 }
 
 /*************************************************
+* Name:        ml_dsa_poly_uniform_eta_4x
+*
+* Description: FIPS 204: Algorithm 31 RejBoundedPoly.
+*              Sample polynomial with uniformly random coefficients
+*              in [-ETA,ETA] by performing rejection sampling on the
+*              output stream from SHAKE256(seed|nonce), 4 at a time,
+*              using vectorized SHAKE implementation.
+*
+* Arguments:   - ml_dsa_params: parameter struct
+*              - poly *a: pointer to output polynomial
+*              - const uint8_t seed[]: byte array with seed of length CRHBYTES
+*              - uint16_t nonce: 2-byte nonce
+**************************************************/
+void ml_dsa_poly_uniform_eta_4x(ml_dsa_params *params,
+                      ml_dsa_poly *a,
+                      const uint8_t seed[ML_DSA_CRHBYTES],
+                      uint16_t nonce)
+{
+  unsigned int ctr;
+  unsigned int buflen = ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE;
+  uint8_t buf[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  KECCAK1600_CTX state;
+
+  uint8_t t[2];
+  t[0] = nonce & 0xff;
+  t[1] = nonce >> 8;
+
+  SHAKE_Init(&state, SHAKE256_BLOCKSIZE);
+  SHAKE_Absorb(&state, seed, ML_DSA_CRHBYTES);
+  SHAKE_Absorb(&state, t, 2);
+  SHAKE_Squeeze(buf, &state, ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE);
+
+  ctr = rej_eta(params, a->coeffs, ML_DSA_N, buf, buflen);
+
+  while(ctr < ML_DSA_N) {
+    SHAKE_Squeeze(buf, &state, SHAKE256_BLOCKSIZE);
+    ctr += rej_eta(params, a->coeffs + ctr, ML_DSA_N - ctr, buf, SHAKE256_BLOCKSIZE);
+  }
+
+  /* FIPS 204. Section 3.6.3 Destruction of intermediate values. */
+  OPENSSL_cleanse(buf, sizeof(buf));
+  OPENSSL_cleanse(&state, sizeof(state));
+}
+
+/*************************************************
 * Name:        ml_dsa_poly_uniform_gamma1
 *
 * Description: Sample polynomial with uniformly random coefficients

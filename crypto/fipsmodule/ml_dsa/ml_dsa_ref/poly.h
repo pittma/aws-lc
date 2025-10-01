@@ -54,6 +54,11 @@ void ml_dsa_poly_uniform_eta(ml_dsa_params *params,
                              const uint8_t seed[ML_DSA_CRHBYTES],
                              uint16_t nonce);
 
+void ml_dsa_poly_uniform_eta_4x(ml_dsa_params *params,
+                             ml_dsa_poly *a,
+                             const uint8_t seed[ML_DSA_CRHBYTES],
+                             uint16_t nonce);
+
 void ml_dsa_poly_uniform_gamma1(ml_dsa_params *params,
                                ml_dsa_poly *a,
                                const uint8_t seed[ML_DSA_CRHBYTES],
