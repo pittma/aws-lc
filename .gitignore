@@ -45,3 +45,4 @@ symbols.txt
 /compile_commands.json
 /scratch
 awslcTestTmpFile*
+.zed/
