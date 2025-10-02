@@ -78,14 +78,14 @@ extern "C" {
 #define SHA3_MAX_BLOCKSIZE SHAKE128_BLOCKSIZE
 
 // Define state flag values for Keccak-based functions
-#define KECCAK1600_STATE_ABSORB     0 
+#define KECCAK1600_STATE_ABSORB     0
 // KECCAK1600_STATE_SQUEEZE is set when |SHAKE_Squeeze| is called.
-// It remains set while |SHAKE_Squeeze| is called repeatedly to output 
+// It remains set while |SHAKE_Squeeze| is called repeatedly to output
 // chunks of the XOF output.
-#define KECCAK1600_STATE_SQUEEZE    1  
-// KECCAK1600_STATE_FINAL is set once |SHAKE_Final| is called 
+#define KECCAK1600_STATE_SQUEEZE    1
+// KECCAK1600_STATE_FINAL is set once |SHAKE_Final| is called
 // so that |SHAKE_Squeeze| cannot be called anymore.
-#define KECCAK1600_STATE_FINAL      2 
+#define KECCAK1600_STATE_FINAL      2
 
 typedef struct keccak_ctx_st KECCAK1600_CTX;
 
@@ -607,6 +607,28 @@ OPENSSL_EXPORT int SHAKE256_x4(const uint8_t *data0, const uint8_t *data1,
                                   const size_t in_len, uint8_t *out0, uint8_t *out1,
                                   uint8_t *out2, uint8_t *out3, size_t out_len);
 
+// Initialize a batched x4 SHAKE256 context, which works on four independent
+// Keccak states.
+OPENSSL_EXPORT int SHAKE256_Init_x4(KECCAK1600_CTX_x4 *ctx);
+
+// Absorb |len| bytes into four independent states, from four independent
+// buffers.
+OPENSSL_EXPORT int SHAKE256_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *in0,
+                                           const uint8_t *in1, const uint8_t *in2,
+                                           const uint8_t *in3, size_t len);
+
+// Absorb |len| bytes into four independent states, from four independent
+// buffers, then finalize.
+OPENSSL_EXPORT int SHAKE256_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *in0,
+                                           const uint8_t *in1, const uint8_t *in2,
+                                           const uint8_t *in3, size_t len);
+
+// Squeeze |blks| |SHAKE256_BLOCKSIZE|-sized blocks from four independent
+// states into four independent buffers.
+OPENSSL_EXPORT int SHAKE256_Squeezeblocks_x4(uint8_t *out0, uint8_t *out1,
+                                             uint8_t *out2, uint8_t *out3,
+                                             KECCAK1600_CTX_x4 *ctx, size_t blks);
+
 /*
  * Keccak1600_ APIs implement Keccak absorb and squeeze phases
  */
@@ -615,6 +637,13 @@ OPENSSL_EXPORT int SHAKE256_x4(const uint8_t *data0, const uint8_t *data1,
 // |len| bytes and returns the remaining number of bytes.
 size_t Keccak1600_Absorb(uint64_t A[KECCAK1600_ROWS][KECCAK1600_ROWS],
                                   const uint8_t *data, size_t len, size_t r);
+
+// Keccak1600_Absorb_once_x4 absorbs exactly |len| bytes from four inputs into four
+// Keccak states.
+void Keccak1600_Absorb_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS],
+                               const uint8_t *inp0, const uint8_t *inp1,
+                               const uint8_t *inp2, const uint8_t *inp3,
+                               size_t len, size_t r, uint8_t p);
 
 // Keccak1600_Absorb_once_x4 absorbs exactly |len| bytes from four inputs into four
 // Keccak states, applying padding character |p|. Unlike Keccak1600_Absorb, this

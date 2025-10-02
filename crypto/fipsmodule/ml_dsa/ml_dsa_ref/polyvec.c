@@ -67,9 +67,13 @@ void ml_dsa_polyvecl_uniform_eta(ml_dsa_params *params,
                                  polyvecl *v,
                                  const uint8_t seed[ML_DSA_CRHBYTES],
                                  uint16_t nonce) {
-  unsigned int i;
-  for(i = 0; i < params->l; ++i)
-    ml_dsa_poly_uniform_eta(params, &v->vec[i], seed, nonce++);
+  unsigned int i = 0;
+  while(i < params->l) {
+    ml_dsa_poly_uniform_eta_x4(params, &v->vec[i], &v->vec[i + 1],
+                               &v->vec[i + 2], &v->vec[i + 3], seed, nonce);
+  }
+  nonce += 4;
+  i += 4;
 }
 
 /*************************************************

@@ -358,6 +358,10 @@ static unsigned int rej_eta(ml_dsa_params *params,
                             unsigned int buflen)
 {
 
+  if (len == 0) {
+      return 0;
+  }
+
   assert((params->eta == 2) ||
          (params->eta == 4));
 
@@ -435,47 +439,86 @@ void ml_dsa_poly_uniform_eta(ml_dsa_params *params,
 }
 
 /*************************************************
-* Name:        ml_dsa_poly_uniform_eta_4x
+* Name:        ml_dsa_poly_uniform_eta_x4
 *
 * Description: FIPS 204: Algorithm 31 RejBoundedPoly.
 *              Sample polynomial with uniformly random coefficients
 *              in [-ETA,ETA] by performing rejection sampling on the
 *              output stream from SHAKE256(seed|nonce), 4 at a time,
-*              using vectorized SHAKE implementation.
+*              using the vectorized SHAKE implementation.
 *
 * Arguments:   - ml_dsa_params: parameter struct
 *              - poly *a: pointer to output polynomial
 *              - const uint8_t seed[]: byte array with seed of length CRHBYTES
 *              - uint16_t nonce: 2-byte nonce
 **************************************************/
-void ml_dsa_poly_uniform_eta_4x(ml_dsa_params *params,
-                      ml_dsa_poly *a,
+void ml_dsa_poly_uniform_eta_x4(ml_dsa_params *params,
+                      ml_dsa_poly *a1,
+                      ml_dsa_poly *a2,
+                      ml_dsa_poly *a3,
+                      ml_dsa_poly *a4,
                       const uint8_t seed[ML_DSA_CRHBYTES],
                       uint16_t nonce)
 {
-  unsigned int ctr;
+  unsigned int ctr1;
+  unsigned int ctr2;
+  unsigned int ctr3;
+  unsigned int ctr4;
+
   unsigned int buflen = ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE;
-  uint8_t buf[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
-  KECCAK1600_CTX state;
 
-  uint8_t t[2];
-  t[0] = nonce & 0xff;
-  t[1] = nonce >> 8;
+  uint8_t b1[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  uint8_t b2[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  uint8_t b3[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  uint8_t b4[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  KECCAK1600_CTX_x4 state;
 
-  SHAKE_Init(&state, SHAKE256_BLOCKSIZE);
-  SHAKE_Absorb(&state, seed, ML_DSA_CRHBYTES);
-  SHAKE_Absorb(&state, t, 2);
-  SHAKE_Squeeze(buf, &state, ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE);
+  uint8_t t1[2];
+  t1[0] = nonce & 0xff;
+  t1[1] = nonce >> 8;
+  nonce += 1;
 
-  ctr = rej_eta(params, a->coeffs, ML_DSA_N, buf, buflen);
+  uint8_t t2[2];
+  t2[0] = nonce & 0xff;
+  t2[1] = nonce >> 8;
+  nonce += 1;
 
-  while(ctr < ML_DSA_N) {
-    SHAKE_Squeeze(buf, &state, SHAKE256_BLOCKSIZE);
-    ctr += rej_eta(params, a->coeffs + ctr, ML_DSA_N - ctr, buf, SHAKE256_BLOCKSIZE);
+  uint8_t t3[2];
+  t3[0] = nonce & 0xff;
+  t3[1] = nonce >> 8;
+  nonce += 1;
+
+  uint8_t t4[2];
+  t4[0] = nonce & 0xff;
+  t4[1] = nonce >> 8;
+
+  SHAKE256_Init_x4(&state);
+  SHAKE256_Absorb_x4(&state, seed, seed, seed, seed,  ML_DSA_CRHBYTES);
+  // NB: Absorb_once also finalizes.
+  SHAKE256_Absorb_once_x4(&state, t1, t2, t3, t4, 2);
+  SHAKE256_Squeezeblocks_x4(b1, b2, b3, b4, &state, ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX);
+
+  ctr1 = rej_eta(params, a1->coeffs, ML_DSA_N, b1, buflen);
+  ctr2 = rej_eta(params, a2->coeffs, ML_DSA_N, b2, buflen);
+  ctr3 = rej_eta(params, a3->coeffs, ML_DSA_N, b3, buflen);
+  ctr4 = rej_eta(params, a4->coeffs, ML_DSA_N, b4, buflen);
+
+  while(ctr1 < ML_DSA_N &&
+        ctr2 < ML_DSA_N &&
+        ctr3 < ML_DSA_N &&
+        ctr4 < ML_DSA_N) {
+    SHAKE256_Squeezeblocks_x4(b1, b2, b3, b4, &state, 1);
+    ctr1 += rej_eta(params, a1->coeffs + ctr1, ML_DSA_N - ctr1, b1, SHAKE256_BLOCKSIZE);
+    ctr2 += rej_eta(params, a2->coeffs + ctr2, ML_DSA_N - ctr2, b2, SHAKE256_BLOCKSIZE);
+    ctr3 += rej_eta(params, a3->coeffs + ctr3, ML_DSA_N - ctr3, b3, SHAKE256_BLOCKSIZE);
+    ctr4 += rej_eta(params, a4->coeffs + ctr4, ML_DSA_N - ctr4, b4, SHAKE256_BLOCKSIZE);
   }
 
   /* FIPS 204. Section 3.6.3 Destruction of intermediate values. */
-  OPENSSL_cleanse(buf, sizeof(buf));
+  OPENSSL_cleanse(b1, sizeof(b1));
+  OPENSSL_cleanse(b2, sizeof(b2));
+  OPENSSL_cleanse(b3, sizeof(b3));
+  OPENSSL_cleanse(b4, sizeof(b4));
   OPENSSL_cleanse(&state, sizeof(state));
 }
 

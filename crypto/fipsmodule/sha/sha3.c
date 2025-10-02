@@ -8,6 +8,7 @@
  */
 
 #include "internal.h"
+#include <stdint.h>
 #include <string.h>
 
 uint8_t *SHA3_224(const uint8_t *data, size_t len,
@@ -123,11 +124,11 @@ static void FIPS202_Reset(KECCAK1600_CTX *ctx) {
 // the internal buffer. It initialises the |ctx| fields and returns 1 on
 // success and 0 on failure.
 static int FIPS202_Init(KECCAK1600_CTX *ctx, uint8_t pad, size_t block_size, size_t bit_len) {
-  if (pad != SHA3_PAD_CHAR && 
-      pad != SHAKE_PAD_CHAR) { 
+  if (pad != SHA3_PAD_CHAR &&
+      pad != SHAKE_PAD_CHAR) {
     return 0;
   }
-      
+
   if (block_size <= sizeof(ctx->buf)) {
       FIPS202_Reset(ctx);
       ctx->block_size = block_size;
@@ -198,7 +199,7 @@ static int FIPS202_Finalize(uint8_t *md, KECCAK1600_CTX *ctx) {
   size_t block_size = ctx->block_size;
   size_t num = ctx->buf_load;
 
-  if (ctx->state == KECCAK1600_STATE_SQUEEZE || 
+  if (ctx->state == KECCAK1600_STATE_SQUEEZE ||
       ctx->state == KECCAK1600_STATE_FINAL ) {
     return 0;
   }
@@ -213,7 +214,7 @@ static int FIPS202_Finalize(uint8_t *md, KECCAK1600_CTX *ctx) {
   if (Keccak1600_Absorb(ctx->A, ctx->buf, block_size, block_size) != 0) {
     return 0;
   }
-  
+
   // ctx->buf is processed, ctx->buf_load is guaranteed to be zero
   ctx->buf_load = 0;
 
@@ -228,9 +229,9 @@ int SHA3_Init(KECCAK1600_CTX *ctx, size_t bit_len) {
     return 0;
   }
 
-  if (bit_len != SHA3_224_DIGEST_BITLENGTH && 
-      bit_len != SHA3_256_DIGEST_BITLENGTH && 
-      bit_len != SHA3_384_DIGEST_BITLENGTH && 
+  if (bit_len != SHA3_224_DIGEST_BITLENGTH &&
+      bit_len != SHA3_256_DIGEST_BITLENGTH &&
+      bit_len != SHA3_384_DIGEST_BITLENGTH &&
       bit_len != SHA3_512_DIGEST_BITLENGTH) {
         return 0;
   }
@@ -472,15 +473,28 @@ int SHAKE128_Squeezeblocks_x4(uint8_t *md0, uint8_t *md1, uint8_t *md2, uint8_t 
   return 1;
 }
 
-static int SHAKE256_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const void *data0, const void *data1,
-                                  const void *data2, const void *data3, size_t len) {
+int SHAKE256_Init_x4(KECCAK1600_CTX_x4 *ctx) {
+  OPENSSL_memset(ctx, 0, sizeof(KECCAK1600_CTX_x4));
+  return 1;
+}
+
+int SHAKE256_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *data0,
+                       const uint8_t *data1, const uint8_t *data2, const uint8_t *data3,
+                       size_t len) {
+  Keccak1600_Absorb_x4(ctx->A, data0, data1, data2, data3, len,
+                       SHAKE256_BLOCKSIZE, SHAKE_PAD_CHAR);
+  return 1;
+}
+
+int SHAKE256_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *data0, const uint8_t *data1,
+                                  const uint8_t *data2, const uint8_t *data3, size_t len) {
   Keccak1600_Absorb_once_x4(ctx->A, data0, data1, data2, data3,
                             len, SHAKE256_BLOCKSIZE, SHAKE_PAD_CHAR);
   return 1;
 }
 
-static int SHAKE256_Squeezeblocks_x4(uint8_t *md0, uint8_t *md1, uint8_t *md2, uint8_t *md3,
-                                  KECCAK1600_CTX_x4 *ctx, size_t blks) {
+int SHAKE256_Squeezeblocks_x4(uint8_t *md0, uint8_t *md1, uint8_t *md2, uint8_t *md3,
+                              KECCAK1600_CTX_x4 *ctx, size_t blks) {
   Keccak1600_Squeezeblocks_x4(ctx->A, md0, md1, md2, md3, blks, SHAKE256_BLOCKSIZE);
   return 1;
 }
