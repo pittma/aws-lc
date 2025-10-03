@@ -71,9 +71,9 @@ void ml_dsa_polyvecl_uniform_eta(ml_dsa_params *params,
   while(i < params->l) {
     ml_dsa_poly_uniform_eta_x4(params, &v->vec[i], &v->vec[i + 1],
                                &v->vec[i + 2], &v->vec[i + 3], seed, nonce);
+    nonce += 4;
+    i += 4;
   }
-  nonce += 4;
-  i += 4;
 }
 
 /*************************************************
