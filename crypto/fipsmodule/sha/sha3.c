@@ -462,7 +462,7 @@ int SHAKE128_Init_x4(KECCAK1600_CTX_x4 *ctx) {
 
 int SHAKE128_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const void *data0, const void *data1,
                                   const void *data2, const void *data3, size_t len) {
-  Keccak1600_Absorb_once_x4(ctx->A, data0, data1, data2, data3, len,
+  Keccak1600_Absorb_final_x4(ctx, data0, data1, data2, data3, len,
                             SHAKE128_BLOCKSIZE, SHAKE_PAD_CHAR);
   return 1;
 }
@@ -481,15 +481,15 @@ int SHAKE256_Init_x4(KECCAK1600_CTX_x4 *ctx) {
 int SHAKE256_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *data0,
                        const uint8_t *data1, const uint8_t *data2, const uint8_t *data3,
                        size_t len) {
-  Keccak1600_Absorb_x4(ctx->A, data0, data1, data2, data3, len,
-                       SHAKE256_BLOCKSIZE, SHAKE_PAD_CHAR);
+  Keccak1600_Absorb_x4(ctx, data0, data1, data2, data3, len,
+                       SHAKE256_BLOCKSIZE);
   return 1;
 }
 
-int SHAKE256_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *data0, const uint8_t *data1,
-                                  const uint8_t *data2, const uint8_t *data3, size_t len) {
-  Keccak1600_Absorb_once_x4(ctx->A, data0, data1, data2, data3,
-                            len, SHAKE256_BLOCKSIZE, SHAKE_PAD_CHAR);
+int SHAKE256_Absorb_final_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *data0, const uint8_t *data1,
+                             const uint8_t *data2, const uint8_t *data3, size_t len) {
+  Keccak1600_Absorb_final_x4(ctx, data0, data1, data2, data3,
+                             len, SHAKE256_BLOCKSIZE, SHAKE_PAD_CHAR);
   return 1;
 }
 
@@ -511,7 +511,7 @@ int SHAKE256_x4(const uint8_t *data0, const uint8_t *data1, const uint8_t *data2
   uint8_t tmp2[SHAKE256_BLOCKSIZE];
   uint8_t tmp3[SHAKE256_BLOCKSIZE];
 
-  SHAKE256_Absorb_once_x4(&ctx, data0, data1, data2, data3, in_len);
+  SHAKE256_Absorb_final_x4(&ctx, data0, data1, data2, data3, in_len);
   SHAKE256_Squeezeblocks_x4(out0, out1, out2, out3, &ctx, nblocks);
 
   out0 += nblocks * SHAKE256_BLOCKSIZE;

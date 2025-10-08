@@ -494,8 +494,7 @@ void ml_dsa_poly_uniform_eta_x4(ml_dsa_params *params,
 
   SHAKE256_Init_x4(&state);
   SHAKE256_Absorb_x4(&state, seed, seed, seed, seed,  ML_DSA_CRHBYTES);
-  // NB: Absorb_once also finalizes.
-  SHAKE256_Absorb_once_x4(&state, t1, t2, t3, t4, 2);
+  SHAKE256_Absorb_final_x4(&state, t1, t2, t3, t4, 2);
   SHAKE256_Squeezeblocks_x4(b1, b2, b3, b4, &state, ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX);
 
   ctr1 = rej_eta(params, a1->coeffs, ML_DSA_N, b1, buflen);

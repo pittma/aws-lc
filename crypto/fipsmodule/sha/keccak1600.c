@@ -491,70 +491,101 @@ static void Keccak1600_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS]) {
 }
 
 // Absorb but do not finalize across four input buffers.
-void Keccak1600_Absorb_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS],
-                               const uint8_t *inp0, const uint8_t *inp1,
-                               const uint8_t *inp2, const uint8_t *inp3,
-                               size_t len, size_t r, uint8_t p) {
+void Keccak1600_Absorb_x4(KECCAK1600_CTX_x4 *ctx,
+                          const uint8_t *inp0, const uint8_t *inp1,
+                          const uint8_t *inp2, const uint8_t *inp3,
+                          size_t len, size_t r) {
     assert(r <= SHA3_MAX_BLOCKSIZE);
 
     while (len >= r) {
-        KeccakF1600_XORBytes_x4(A, inp0, inp1, inp2, inp3, r);
-        Keccak1600_x4(A);
+        KeccakF1600_XORBytes_x4(ctx->A, inp0, inp1, inp2, inp3, r);
+        Keccak1600_x4(ctx->A);
         inp0 += r;
         inp1 += r;
         inp2 += r;
         inp3 += r;
         len -= r;
     }
+
+    OPENSSL_memcpy(ctx->buf0, inp0, len);
+    OPENSSL_memcpy(ctx->buf1, inp1, len);
+    OPENSSL_memcpy(ctx->buf2, inp2, len);
+    OPENSSL_memcpy(ctx->buf3, inp3, len);
+    ctx->buf_load = len;
+
 }
 
 // One-shot absorb + finalize. Note that in contrast to non-batched Keccak,
 // this does _not_ run a Keccak permutation at the end, allowing for a uniform
 // implementation of Keccak1600_Squeezeblocks_x4() without `padded` parameter
 // as in the non-batched implementation.
-void Keccak1600_Absorb_once_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS],
+void Keccak1600_Absorb_final_x4(KECCAK1600_CTX_x4 *ctx,
                                const uint8_t *inp0, const uint8_t *inp1,
                                const uint8_t *inp2, const uint8_t *inp3,
                                size_t len, size_t r, uint8_t p) {
     assert(r <= SHA3_MAX_BLOCKSIZE);
 
-    while (len >= r) {
-        KeccakF1600_XORBytes_x4(A, inp0, inp1, inp2, inp3, r);
-        Keccak1600_x4(A);
-        inp0 += r;
-        inp1 += r;
-        inp2 += r;
-        inp3 += r;
-        len -= r;
+    alignas(16) uint8_t temp[4][SHA3_MAX_BLOCKSIZE] = {{0}};
+
+    // Churn through bytes in the intermediate buffer first.
+    size_t buf_offset = 0;
+    while (ctx->buf_load >= r) {
+        KeccakF1600_XORBytes_x4(ctx->A, ctx->buf0 + buf_offset,
+                                ctx->buf1 + buf_offset, ctx->buf2 + buf_offset,
+                                ctx->buf3 + buf_offset, r);
+        Keccak1600_x4(ctx->A);
+        ctx->buf_load -= r;
+        buf_offset += r;
     }
 
-    // Build 16-byte aligned final blocks for each input
-    alignas(16) uint8_t final[4][SHA3_MAX_BLOCKSIZE] = {{0}};
+    // Now we know that buf_load <= rate, so we can use the temp buffers as glue
+    // between the ctx-> buffers and the input bytes.
+    if (ctx->buf_load != 0) {
+      OPENSSL_memcpy(temp[0], ctx->buf0 + buf_offset, ctx->buf_load);
+      OPENSSL_memcpy(temp[0] + ctx->buf_load, inp0, MIN(len, ctx->buf_load - r));
 
-    // Copy the remainder bytes to final blocks
-    OPENSSL_memcpy(final[0], inp0, len);
-    OPENSSL_memcpy(final[1], inp1, len);
-    OPENSSL_memcpy(final[2], inp2, len);
-    OPENSSL_memcpy(final[3], inp3, len);
+      OPENSSL_memcpy(temp[1], ctx->buf1 + buf_offset, ctx->buf_load);
+      OPENSSL_memcpy(temp[2], ctx->buf2 + buf_offset, ctx->buf_load);
+      OPENSSL_memcpy(temp[3], ctx->buf3 + buf_offset, ctx->buf_load);
+    }
+
+
+      while (len >= r) {
+          KeccakF1600_XORBytes_x4(ctx->A, inp0, inp1, inp2, inp3, r);
+          Keccak1600_x4(ctx->A);
+          inp0 += r;
+          inp1 += r;
+          inp2 += r;
+          inp3 += r;
+          len -= r;
+      }
+      // zero-out temp.
+      OPENSSL_memset(temp, 0, sizeof(temp));
+
+    // copy remaining bytes.
+    OPENSSL_memcpy(temp[0], inp0, len);
+    OPENSSL_memcpy(temp[1], inp1, len);
+    OPENSSL_memcpy(temp[2], inp2, len);
+    OPENSSL_memcpy(temp[3], inp3, len);
 
     if (len == r - 1) {
         p |= 128;
     } else {
-        final[0][r - 1] |= 128;
-        final[1][r - 1] |= 128;
-        final[2][r - 1] |= 128;
-        final[3][r - 1] |= 128;
+        temp[0][r - 1] |= 128;
+        temp[1][r - 1] |= 128;
+        temp[2][r - 1] |= 128;
+        temp[3][r - 1] |= 128;
     }
 
-    final[0][len] |= p;
-    final[1][len] |= p;
-    final[2][len] |= p;
-    final[3][len] |= p;
+    temp[0][len] |= p;
+    temp[1][len] |= p;
+    temp[2][len] |= p;
+    temp[3][len] |= p;
 
-    KeccakF1600_XORBytes_x4(A, final[0], final[1], final[2], final[3], r);
+    KeccakF1600_XORBytes_x4(ctx->A, temp[0], temp[1], temp[2], temp[3], r);
 
     // Clean up final blocks to avoid stack leakage
-    OPENSSL_cleanse(final, sizeof(final));
+    OPENSSL_cleanse(temp, sizeof(temp));
 }
 
 void Keccak1600_Squeezeblocks_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS], uint8_t *out0, uint8_t *out1,

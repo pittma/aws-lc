@@ -115,6 +115,11 @@ typedef struct keccak_ctx_st_x4 KECCAK1600_CTX_x4;
 
 struct keccak_ctx_st_x4 {
   uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS];
+  uint8_t buf0[SHA3_MAX_BLOCKSIZE];
+  uint8_t buf1[SHA3_MAX_BLOCKSIZE];
+  uint8_t buf2[SHA3_MAX_BLOCKSIZE];
+  uint8_t buf3[SHA3_MAX_BLOCKSIZE];
+  size_t buf_load;
 };
 
 // Define SHA{n}[_{variant}]_ASM if sha{n}_block_data_order[_{variant}] is
@@ -619,9 +624,9 @@ OPENSSL_EXPORT int SHAKE256_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *in0
 
 // Absorb |len| bytes into four independent states, from four independent
 // buffers, then finalize.
-OPENSSL_EXPORT int SHAKE256_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *in0,
-                                           const uint8_t *in1, const uint8_t *in2,
-                                           const uint8_t *in3, size_t len);
+OPENSSL_EXPORT int SHAKE256_Absorb_final_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *in0,
+                                            const uint8_t *in1, const uint8_t *in2,
+                                            const uint8_t *in3, size_t len);
 
 // Squeeze |blks| |SHAKE256_BLOCKSIZE|-sized blocks from four independent
 // states into four independent buffers.
@@ -640,15 +645,15 @@ size_t Keccak1600_Absorb(uint64_t A[KECCAK1600_ROWS][KECCAK1600_ROWS],
 
 // Keccak1600_Absorb_once_x4 absorbs exactly |len| bytes from four inputs into four
 // Keccak states.
-void Keccak1600_Absorb_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS],
-                               const uint8_t *inp0, const uint8_t *inp1,
-                               const uint8_t *inp2, const uint8_t *inp3,
-                               size_t len, size_t r, uint8_t p);
+void Keccak1600_Absorb_x4(KECCAK1600_CTX_x4 *ctx,
+                          const uint8_t *inp0, const uint8_t *inp1,
+                          const uint8_t *inp2, const uint8_t *inp3,
+                          size_t len, size_t r);
 
-// Keccak1600_Absorb_once_x4 absorbs exactly |len| bytes from four inputs into four
+// Keccak1600_Absorb_final_x4 absorbs exactly |len| bytes from four inputs into four
 // Keccak states, applying padding character |p|. Unlike Keccak1600_Absorb, this
 // processes a single block and takes the padding character as an additional argument.
-void Keccak1600_Absorb_once_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS],
+void Keccak1600_Absorb_final_x4(KECCAK1600_CTX_x4 *ctx,
                                const uint8_t *inp0, const uint8_t *inp1,
                                const uint8_t *inp2, const uint8_t *inp3,
                                size_t len, size_t r, uint8_t p);
