@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <immintrin.h>
 #include "params.h"
 #include "poly.h"
 #include "ntt.h"
@@ -342,34 +343,31 @@ void ml_dsa_poly_uniform_x4(ml_dsa_poly *a0, ml_dsa_poly *a1, ml_dsa_poly *a2,
 {
   unsigned int i, ctr0, ctr1, ctr2, ctr3, off;
   unsigned int buflen = POLY_UNIFORM_NBLOCKS*SHAKE128_BLOCKSIZE;
-  alignas(16) uint8_t buf[4][POLY_UNIFORM_NBLOCKS*SHAKE128_BLOCKSIZE + 2] = {{0}};
+  uint8_t buf[4][POLY_UNIFORM_NBLOCKS*SHAKE128_BLOCKSIZE + 2] = {{0}};
+
+  uint8_t nonces[4][2] = {{0}};
+
+  nonces[0][0] = nonce & 0xff;
+  nonces[0][1] = nonce >> 8;
+  nonce += 1;
+
+  nonces[1][0] = nonce & 0xff;
+  nonces[1][1] = nonce >> 8;
+  nonce += 1;
+
+  nonces[2][0] = nonce & 0xff;
+  nonces[2][1] = nonce >> 8;
+  nonce += 1;
+
+  nonces[3][0] = nonce & 0xff;
+  nonces[3][1] = nonce >> 8;
+  nonce += 1;
+
   KECCAK1600_CTX_x4 state;
-  alignas(16) uint8_t input[4][ML_DSA_SEEDBYTES + 2] = {{0}};
-
-  OPENSSL_memcpy(input[0], seed, ML_DSA_SEEDBYTES);
-  OPENSSL_memcpy(input[1], seed, ML_DSA_SEEDBYTES);
-  OPENSSL_memcpy(input[2], seed, ML_DSA_SEEDBYTES);
-  OPENSSL_memcpy(input[3], seed, ML_DSA_SEEDBYTES);
-
-  input[0][ML_DSA_SEEDBYTES] = nonce & 0xff;
-  input[0][ML_DSA_SEEDBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
-  input[1][ML_DSA_SEEDBYTES] = nonce & 0xff;
-  input[1][ML_DSA_SEEDBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
-  input[2][ML_DSA_SEEDBYTES] = nonce & 0xff;
-  input[2][ML_DSA_SEEDBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
-  input[3][ML_DSA_SEEDBYTES] = nonce & 0xff;
-  input[3][ML_DSA_SEEDBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
   SHAKE128_Init_x4(&state);
-  SHAKE128_Absorb_once_x4(&state, input[0], input[1], input[2], input[3],
-                          ML_DSA_SEEDBYTES + 2);
+  SHAKE128_Absorb_x4(&state, seed, seed, seed, seed, ML_DSA_SEEDBYTES);
+  SHAKE128_Absorb_x4(&state, nonces[0], nonces[1], nonces[2], nonces[3], 2);
+  SHAKE128_Finalize_x4(&state);
   SHAKE128_Squeezeblocks_x4(buf[0], buf[1], buf[2], buf[3], &state,
                             POLY_UNIFORM_NBLOCKS);
 
@@ -400,7 +398,7 @@ void ml_dsa_poly_uniform_x4(ml_dsa_poly *a0, ml_dsa_poly *a1, ml_dsa_poly *a2,
   }
   /* FIPS 204. Section 3.6.3 Destruction of intermediate values. */
   OPENSSL_cleanse(buf, sizeof(buf));
-  OPENSSL_cleanse(input, sizeof(input));
+  OPENSSL_cleanse(nonces, sizeof(nonces));
   OPENSSL_cleanse(&state, sizeof(state));
 }
 
@@ -535,61 +533,51 @@ void ml_dsa_poly_uniform_eta_x4(ml_dsa_params *params,
 
   unsigned int buflen = ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE;
 
-  uint8_t b1[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
-  uint8_t b2[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
-  uint8_t b3[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
-  uint8_t b4[ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  alignas(16) uint8_t bufs[4][ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX * SHAKE256_BLOCKSIZE];
+  uint8_t nonces[4][2];
   KECCAK1600_CTX_x4 state;
 
-  alignas(16) uint8_t input[4][SHA3_MAX_BLOCKSIZE] = {{0}};
-  OPENSSL_memcpy(input[0], seed, ML_DSA_CRHBYTES);
-  OPENSSL_memcpy(input[1], seed, ML_DSA_CRHBYTES);
-  OPENSSL_memcpy(input[2], seed, ML_DSA_CRHBYTES);
-  OPENSSL_memcpy(input[3], seed, ML_DSA_CRHBYTES);
-
-  input[0][ML_DSA_CRHBYTES] = nonce & 0xff;
-  input[0][ML_DSA_CRHBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
-  input[1][ML_DSA_CRHBYTES] = nonce & 0xff;
-  input[1][ML_DSA_CRHBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
-  input[2][ML_DSA_CRHBYTES] = nonce & 0xff;
-  input[2][ML_DSA_CRHBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
-  input[3][ML_DSA_CRHBYTES] = nonce & 0xff;
-  input[3][ML_DSA_CRHBYTES + 1] = nonce >> 8;
-  nonce += 1;
-
   SHAKE256_Init_x4(&state);
-  SHAKE256_Absorb_once_x4(&state, input[0], input[1], input[2], input[3],
-                          ML_DSA_CRHBYTES + 2);
-  SHAKE256_Squeezeblocks_x4(b1, b2, b3, b4, &state, ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX);
+  SHAKE256_Absorb_x4(&state, seed, seed, seed, seed, ML_DSA_CRHBYTES);
+  nonces[0][0] = nonce & 0xff;
+  nonces[0][1] = nonce >> 8;
+  nonce += 1;
 
-  ctr1 = rej_eta(params, a1->coeffs, ML_DSA_N, b1, buflen);
-  ctr2 = rej_eta(params, a2->coeffs, ML_DSA_N, b2, buflen);
-  ctr3 = rej_eta(params, a3->coeffs, ML_DSA_N, b3, buflen);
-  ctr4 = rej_eta(params, a4->coeffs, ML_DSA_N, b4, buflen);
+  nonces[1][0] = nonce & 0xff;
+  nonces[1][1] = nonce >> 8;
+  nonce += 1;
+
+  nonces[2][0] = nonce & 0xff;
+  nonces[2][1] = nonce >> 8;
+  nonce += 1;
+
+  nonces[3][0] = nonce & 0xff;
+  nonces[3][1] = nonce >> 8;
+
+  SHAKE256_Absorb_x4(&state, nonces[0], nonces[1], nonces[2], nonces[3], 2);
+  SHAKE256_Finalize_x4(&state);
+  SHAKE256_Squeezeblocks_x4(bufs[0], bufs[1], bufs[2], bufs[3], &state,
+                            ML_DSA_POLY_UNIFORM_ETA_NBLOCKS_MAX);
+
+  ctr1 = rej_eta(params, a1->coeffs, ML_DSA_N, bufs[0], buflen);
+  ctr2 = rej_eta(params, a2->coeffs, ML_DSA_N, bufs[1], buflen);
+  ctr3 = rej_eta(params, a3->coeffs, ML_DSA_N, bufs[2], buflen);
+  ctr4 = rej_eta(params, a4->coeffs, ML_DSA_N, bufs[3], buflen);
 
   while(ctr1 < ML_DSA_N ||
         ctr2 < ML_DSA_N ||
         ctr3 < ML_DSA_N ||
         ctr4 < ML_DSA_N) {
-    SHAKE256_Squeezeblocks_x4(b1, b2, b3, b4, &state, 1);
-    ctr1 += rej_eta(params, a1->coeffs + ctr1, ML_DSA_N - ctr1, b1, SHAKE256_BLOCKSIZE);
-    ctr2 += rej_eta(params, a2->coeffs + ctr2, ML_DSA_N - ctr2, b2, SHAKE256_BLOCKSIZE);
-    ctr3 += rej_eta(params, a3->coeffs + ctr3, ML_DSA_N - ctr3, b3, SHAKE256_BLOCKSIZE);
-    ctr4 += rej_eta(params, a4->coeffs + ctr4, ML_DSA_N - ctr4, b4, SHAKE256_BLOCKSIZE);
+    SHAKE256_Squeezeblocks_x4(bufs[0], bufs[1], bufs[2], bufs[3], &state, 1);
+    ctr1 += rej_eta(params, a1->coeffs + ctr1, ML_DSA_N - ctr1, bufs[0], SHAKE256_BLOCKSIZE);
+    ctr2 += rej_eta(params, a2->coeffs + ctr2, ML_DSA_N - ctr2, bufs[1], SHAKE256_BLOCKSIZE);
+    ctr3 += rej_eta(params, a3->coeffs + ctr3, ML_DSA_N - ctr3, bufs[2], SHAKE256_BLOCKSIZE);
+    ctr4 += rej_eta(params, a4->coeffs + ctr4, ML_DSA_N - ctr4, bufs[3], SHAKE256_BLOCKSIZE);
   }
 
   /* FIPS 204. Section 3.6.3 Destruction of intermediate values. */
-  OPENSSL_cleanse(b1, sizeof(b1));
-  OPENSSL_cleanse(b2, sizeof(b2));
-  OPENSSL_cleanse(b3, sizeof(b3));
-  OPENSSL_cleanse(b4, sizeof(b4));
-  OPENSSL_cleanse(input, sizeof(input));
+  OPENSSL_cleanse(bufs, sizeof(bufs));
+  OPENSSL_cleanse(nonces, sizeof(nonces));
   OPENSSL_cleanse(&state, sizeof(state));
 }
 

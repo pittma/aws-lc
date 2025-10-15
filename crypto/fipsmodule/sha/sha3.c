@@ -452,12 +452,83 @@ int SHAKE_Squeeze(uint8_t *md, KECCAK1600_CTX *ctx, size_t len) {
   return 1;
 }
 
+int SHAKE_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const void *data0,
+                    const void *data1, const void *data2,
+                    const void *data3, size_t len, size_t r) {
+  if (ctx->finalized) {
+      return 0;
+  }
+
+  if (ctx->buf_load > 0) {
+    size_t load_plus_len = ctx->buf_load + len;
+    if (load_plus_len < r) {
+        OPENSSL_memcpy(ctx->buf0 + ctx->buf_load, data0, len);
+        OPENSSL_memcpy(ctx->buf1 + ctx->buf_load, data1, len);
+        OPENSSL_memcpy(ctx->buf2 + ctx->buf_load, data2, len);
+        OPENSSL_memcpy(ctx->buf3 + ctx->buf_load, data3, len);
+        ctx->buf_load = load_plus_len;
+        return 1;
+    } else {
+      size_t to_steal = r - ctx->buf_load;
+      OPENSSL_memcpy(ctx->buf0 + ctx->buf_load, data0, to_steal);
+      OPENSSL_memcpy(ctx->buf1 + ctx->buf_load, data1, to_steal);
+      OPENSSL_memcpy(ctx->buf2 + ctx->buf_load, data2, to_steal);
+      OPENSSL_memcpy(ctx->buf3 + ctx->buf_load, data3, to_steal);
+      Keccak1600_Absorb_x4(ctx->A, ctx->buf0, ctx->buf1, ctx->buf2,
+                           ctx->buf3, r, r);
+      data0 += to_steal;
+      data1 += to_steal;
+      data2 += to_steal;
+      data3 += to_steal;
+      len -= to_steal;
+    }
+  }
+
+  while(len >= r) {
+    Keccak1600_Absorb_x4(ctx->A, data0, data1, data2, data3, r,
+                         r);
+    data0 += r;
+    data1 += r;
+    data2 += r;
+    data3 += r;
+    len -= r;
+  }
+
+  OPENSSL_memcpy(ctx->buf0, data0, len);
+  OPENSSL_memcpy(ctx->buf1, data1, len);
+  OPENSSL_memcpy(ctx->buf2, data2, len);
+  OPENSSL_memcpy(ctx->buf3, data3, len);
+  ctx->buf_load = len;
+  return 1;
+}
+
+int SHAKE_Finalize_x4(KECCAK1600_CTX_x4* ctx, size_t r) {
+  if (!ctx->finalized) {
+    Keccak1600_Absorb_once_x4(ctx->A, ctx->buf0, ctx->buf1, ctx->buf2,
+                              ctx->buf3, ctx->buf_load, r, SHAKE_PAD_CHAR);
+    ctx->finalized = true;
+  }
+  return 1;
+}
+
+
 /*
  * SHAKE batched (x4) APIs implement SHAKE functionalities in batches of four on top of SHAKE API layer
  */
 int SHAKE128_Init_x4(KECCAK1600_CTX_x4 *ctx) {
   OPENSSL_memset(ctx, 0, sizeof(KECCAK1600_CTX_x4));
   return 1;
+}
+
+int SHAKE128_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const void *data0,
+                       const void *data1, const void *data2,
+                       const void *data3, size_t len) {
+  return SHAKE_Absorb_x4(ctx, data0, data1,data2, data3, len,
+                         SHAKE128_BLOCKSIZE);
+}
+
+int SHAKE128_Finalize_x4(KECCAK1600_CTX_x4 *ctx) {
+  return SHAKE_Finalize_x4(ctx, SHAKE128_BLOCKSIZE);
 }
 
 int SHAKE128_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const void *data0, const void *data1,
@@ -476,6 +547,17 @@ int SHAKE128_Squeezeblocks_x4(uint8_t *md0, uint8_t *md1, uint8_t *md2, uint8_t 
 int SHAKE256_Init_x4(KECCAK1600_CTX_x4 *ctx) {
   OPENSSL_memset(ctx, 0, sizeof(KECCAK1600_CTX_x4));
   return 1;
+}
+
+int SHAKE256_Absorb_x4(KECCAK1600_CTX_x4 *ctx, const void *data0,
+                       const void *data1, const void *data2,
+                       const void *data3, size_t len) {
+  return SHAKE_Absorb_x4(ctx, data0, data1,data2, data3, len,
+                         SHAKE256_BLOCKSIZE);
+}
+
+int SHAKE256_Finalize_x4(KECCAK1600_CTX_x4 *ctx) {
+  return SHAKE_Finalize_x4(ctx, SHAKE256_BLOCKSIZE);
 }
 
 int SHAKE256_Absorb_once_x4(KECCAK1600_CTX_x4 *ctx, const uint8_t *data0, const uint8_t *data1,

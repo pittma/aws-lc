@@ -8,6 +8,7 @@
  */
 
 #include <assert.h>
+#include <stdint.h>
 #include "internal.h"
 #include "../../internal.h"
 #include "../cpucap/internal.h"
@@ -454,6 +455,22 @@ static void Keccak1600_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS]) {
     KeccakF1600(A[1]);
     KeccakF1600(A[2]);
     KeccakF1600(A[3]);
+}
+
+size_t Keccak1600_Absorb_x4(uint64_t A[4][KECCAK1600_ROWS][KECCAK1600_ROWS],
+                            const uint8_t *inp0, const uint8_t *inp1,
+                            const uint8_t *inp2, const uint8_t *inp3,
+                            size_t len, size_t r) {
+    while (len >= r) {
+        KeccakF1600_XORBytes_x4(A, inp0, inp1, inp2, inp3, r);
+        Keccak1600_x4(A);
+        inp0 += r;
+        inp1 += r;
+        inp2 += r;
+        inp3 += r;
+        len -= r;
+    }
+    return len;
 }
 
 // One-shot absorb + finalize. Note that in contract to non-batched Keccak,
