@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <immintrin.h>
 #include "params.h"
 #include "poly.h"
 #include "ntt.h"
@@ -346,10 +347,11 @@ void ml_dsa_poly_uniform_x4(ml_dsa_poly *a0, ml_dsa_poly *a1, ml_dsa_poly *a2,
   KECCAK1600_CTX_x4 state;
   alignas(16) uint8_t input[4][ML_DSA_SEEDBYTES + 2] = {{0}};
 
-  OPENSSL_memcpy(input[0], seed, ML_DSA_SEEDBYTES);
-  OPENSSL_memcpy(input[1], seed, ML_DSA_SEEDBYTES);
-  OPENSSL_memcpy(input[2], seed, ML_DSA_SEEDBYTES);
-  OPENSSL_memcpy(input[3], seed, ML_DSA_SEEDBYTES);
+  __m256i seed_tmp = _mm256_loadu_si256((__m256i*)seed);
+  _mm256_storeu_si256((__m256i*)input[0], seed_tmp);
+  _mm256_storeu_si256((__m256i*)input[1], seed_tmp);
+  _mm256_storeu_si256((__m256i*)input[2], seed_tmp);
+  _mm256_storeu_si256((__m256i*)input[3], seed_tmp);
 
   input[0][ML_DSA_SEEDBYTES] = nonce & 0xff;
   input[0][ML_DSA_SEEDBYTES + 1] = nonce >> 8;
@@ -542,10 +544,11 @@ void ml_dsa_poly_uniform_eta_x4(ml_dsa_params *params,
   KECCAK1600_CTX_x4 state;
 
   alignas(16) uint8_t input[4][SHA3_MAX_BLOCKSIZE] = {{0}};
-  OPENSSL_memcpy(input[0], seed, ML_DSA_CRHBYTES);
-  OPENSSL_memcpy(input[1], seed, ML_DSA_CRHBYTES);
-  OPENSSL_memcpy(input[2], seed, ML_DSA_CRHBYTES);
-  OPENSSL_memcpy(input[3], seed, ML_DSA_CRHBYTES);
+  __m256i seed_tmp = _mm256_loadu_si256((__m256i*)seed);
+  _mm256_storeu_si256((__m256i*)input[0], seed_tmp);
+  _mm256_storeu_si256((__m256i*)input[1], seed_tmp);
+  _mm256_storeu_si256((__m256i*)input[2], seed_tmp);
+  _mm256_storeu_si256((__m256i*)input[3], seed_tmp);
 
   input[0][ML_DSA_CRHBYTES] = nonce & 0xff;
   input[0][ML_DSA_CRHBYTES + 1] = nonce >> 8;
