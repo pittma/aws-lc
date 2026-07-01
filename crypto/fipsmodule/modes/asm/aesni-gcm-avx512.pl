@@ -4190,7 +4190,7 @@ ___
   # ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   $code .= <<___;
 .globl gcm_init_avx512
-.hidden gcm_init_avx512
+#.hidden gcm_init_avx512
 .type gcm_init_avx512,\@abi-omnipotent
 .align 32
 gcm_init_avx512:
@@ -4832,8 +4832,8 @@ sub vaesni {
 }
 
 $code =~ s/\`([^\`]*)\`/eval $1/gem;
-$code =~ s/\b(vpclmul.*).*$/vpclmulqdq($1)/gem;
-$code =~ s/\b(vaesenc.*).*$/vaesni($1)/gem;
+# $code =~ s/\b(vpclmul.*).*$/vpclmulqdq($1)/gem;
+# $code =~ s/\b(vaesenc.*).*$/vaesni($1)/gem;
 
 print $code;
 close STDOUT or die "error closing STDOUT: $!";
